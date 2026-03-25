@@ -19,6 +19,17 @@ variable "s3_state_role_arns" {
   default     = {}
 }
 
+variable "custom_sub_account_roles" {
+  description = "Custom roles to create in sub-accounts"
+  type = map(object({
+    account            = string
+    policy_arns        = list(string)
+    inline_policy      = optional(string)
+    trusted_oidc_repos = list(string)
+  }))
+  default = {}
+}
+
 variable "thumbprint_list" {
   description = "OIDC thumbprints for GitHub Actions (AWS no longer validates these but the field is required)"
   type        = list(string)

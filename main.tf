@@ -1,13 +1,39 @@
 locals {
-  role_name_prefix   = "github-oidc-"
   role_max_length    = 64
   hash_suffix_length = 8
   hash_separator     = "-"
 
+  # Naming helpers
+  prefixes = {
+    oidc     = "github-oidc-"
+    s3_state = "oidc-s3-state-"
+    custom   = "oidc-custom-"
+  }
+
+  _name = { for prefix_key, prefix in local.prefixes : prefix_key => {
+    max_trunk = local.role_max_length - length(prefix) - local.hash_suffix_length - length(local.hash_separator)
+  } }
+
   role_names = { for repo, cfg in var.github_repos : repo =>
-    length("${local.role_name_prefix}${repo}") <= local.role_max_length
-    ? "${local.role_name_prefix}${repo}"
-    : "${local.role_name_prefix}${substr(repo, 0, local.role_max_length - length(local.role_name_prefix) - local.hash_suffix_length - length(local.hash_separator))}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
+    length("${local.prefixes.oidc}${repo}") <= local.role_max_length
+    ? "${local.prefixes.oidc}${repo}"
+    : "${local.prefixes.oidc}${substr(repo, 0, local._name.oidc.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
+  }
+
+  s3_state_role_names = { for repo, cfg in var.github_repos : repo =>
+    length("${local.prefixes.s3_state}${repo}") <= local.role_max_length
+    ? "${local.prefixes.s3_state}${repo}"
+    : "${local.prefixes.s3_state}${substr(repo, 0, local._name.s3_state.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
+  }
+
+  custom_role_names = { for key, cfg in var.custom_sub_account_roles : key =>
+    length("${local.prefixes.custom}${key}") <= local.role_max_length
+    ? "${local.prefixes.custom}${key}"
+    : "${local.prefixes.custom}${substr(key, 0, local._name.custom.max_trunk)}${local.hash_separator}${substr(sha256(key), 0, local.hash_suffix_length)}"
+  }
+
+  state_prefixes = { for repo, cfg in var.github_repos : repo =>
+    "${lower(cfg.github_org)}/${lower(repo)}"
   }
 
   tags = { for repo, cfg in var.github_repos : repo => merge(
