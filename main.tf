@@ -124,7 +124,7 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
       Action = "sts:AssumeRole"
       Resource = concat(
         [for acct, role in each.value.infra_accounts : "arn:aws:iam::${var.sub_account_ids[acct]}:role/${role}"],
-        lookup(var.s3_state_role_arns, each.key, null) != null ? [var.s3_state_role_arns[each.key]] : []
+        ["arn:aws:iam::${var.sub_account_ids[each.value.state_account]}:role/${local.s3_state_role_names[each.key]}"]
       )
     }]
   })

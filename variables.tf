@@ -13,12 +13,6 @@ variable "sub_account_ids" {
   type        = map(string)
 }
 
-variable "s3_state_role_arns" {
-  description = "Map of repo name to the S3 state role ARN in the sub-account (included in non-admin assume-role policies)"
-  type        = map(string)
-  default     = {}
-}
-
 variable "custom_sub_account_roles" {
   description = "Custom roles to create in sub-accounts"
   type = map(object({
