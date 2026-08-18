@@ -74,34 +74,28 @@ variable "account_ids" {
 }
 
 variable "custom_roles" {
-  description = "Scoped roles this module pair creates in the configured accounts and grants to the repos listed in trusted_oidc_repos."
-  type = map(object({
-    account            = string
+  description = "Scoped roles this module pair creates, grouped by account: account name => role name => config. Each repo listed in trusted_oidc_repos is granted sts:AssumeRole on the role automatically. Role names render as oidc-custom-<account>--<RoleName>."
+  type = map(map(object({
     policy_arns        = list(string)
     inline_policy      = optional(string)
     trusted_oidc_repos = list(string)
-  }))
+  })))
   default = {}
 
   validation {
     condition = alltrue([
-      for key, cfg in var.custom_roles :
-      alltrue([for r in cfg.trusted_oidc_repos : contains([for gr in var.github_repos : gr.repo_name], r)])
+      for acct, roles in var.custom_roles : alltrue([
+        for name, cfg in roles :
+        alltrue([for r in cfg.trusted_oidc_repos : contains([for gr in var.github_repos : gr.repo_name], r)])
+      ])
     ])
     error_message = "custom_roles: every trusted_oidc_repos entry must match a repo_name in github_repos."
   }
 
   validation {
-    condition     = alltrue([for key, cfg in var.custom_roles : startswith(key, "${cfg.account}--")])
-    error_message = "custom_roles: keys must follow \"<account>--<RoleName>\" and the <account> prefix must match the entry's account field (the key names the role; the field places it)."
+    condition     = alltrue([for acct in keys(var.custom_roles) : contains(keys(var.account_ids), acct)])
+    error_message = "custom_roles: every account key must exist in account_ids."
   }
-}
-
-variable "immutable_subs_only" {
-  deprecated  = "Transitional escape hatch only; opt your repos into immutable subject claims (use_immutable_subject) instead. This variable will be removed in a future major version."
-  description = "DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set override_subs."
-  type        = bool
-  default     = true
 }
 
 variable "thumbprint_list" {

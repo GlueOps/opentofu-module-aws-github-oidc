@@ -16,6 +16,23 @@ locals {
 }
 
 locals {
+  # Nested custom_roles (account => name => cfg) flattened to the historical
+  # "<account>--<name>" keys. Role names, outputs, and every sub-account
+  # resource address derive from these keys — the flat key IS the stable
+  # contract; never re-key.
+  custom_roles_flat = merge([
+    for acct, roles in var.custom_roles : {
+      for name, cfg in roles : "${acct}--${name}" => {
+        account            = acct
+        policy_arns        = cfg.policy_arns
+        inline_policy      = cfg.inline_policy
+        trusted_oidc_repos = cfg.trusted_oidc_repos
+      }
+    }
+  ]...)
+}
+
+locals {
   role_max_length    = 64
   hash_suffix_length = 8
   hash_separator     = "-"
@@ -43,7 +60,7 @@ locals {
     : "${local.prefixes.s3_state}${substr(repo, 0, local._name.s3_state.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
   }
 
-  custom_role_names = { for key, cfg in var.custom_roles : key =>
+  custom_role_names = { for key, cfg in local.custom_roles_flat : key =>
     length("${local.prefixes.custom}${key}") <= local.role_max_length
     ? "${local.prefixes.custom}${key}"
     : "${local.prefixes.custom}${substr(key, 0, local._name.custom.max_trunk)}${local.hash_separator}${substr(sha256(key), 0, local.hash_suffix_length)}"
@@ -87,16 +104,13 @@ resource "aws_iam_openid_connect_provider" "github" {
 # rejects any trust policy without a non-wildcard-only sub condition. Default
 # scope per repo: only workflows on the repo's default branch. PR-triggered
 # runs mint a ":pull_request" sub, not the branch ref, so plan-on-PR pipelines
-# must opt in per repo with allow_pull_requests = true. Legacy-format
-# equivalents are added when immutable_subs_only = false; override_subs
-# replaces the defaults entirely.
+# must opt in per repo with allow_pull_requests = true. override_subs
+# replaces the defaults entirely. Only the immutable sub format is emitted —
+# every repo must mint immutable subject claims (created after 2026-07-15 or
+# opted in via use_immutable_subject).
 
 locals {
   sub_patterns = { for repo, cfg in local.repos : repo => coalesce(cfg.override_subs, concat(
-    var.immutable_subs_only ? [] : concat(
-      ["repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}"],
-      cfg.allow_pull_requests ? ["repo:${cfg.github_org}/${repo}:pull_request"] : [],
-    ),
     ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:ref:refs/heads/${cfg.default_branch}"],
     cfg.allow_pull_requests ? ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:pull_request"] : [],
   )) }
@@ -153,10 +167,8 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
 
 locals {
   repo_custom_role_arns = { for repo in keys(local.repos) : repo => {
-    for key, cfg in var.custom_roles :
-    # "unknown" placeholder never reaches AWS: the precondition below rejects
-    # any custom role whose account is missing from account_ids.
-    key => "arn:aws:iam::${try(var.account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
+    for key, cfg in local.custom_roles_flat :
+    key => "arn:aws:iam::${var.account_ids[cfg.account]}:role/${local.custom_role_names[key]}"
     if contains(cfg.trusted_oidc_repos, repo)
   } }
 }
@@ -183,12 +195,8 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
     precondition {
       condition = contains(keys(var.account_ids), each.value.state_account) && alltrue([
         for acct in keys(each.value.assume_existing_roles) : contains(keys(var.account_ids), acct)
-        ]) && alltrue([
-        for key, cfg in var.custom_roles :
-        contains(keys(var.account_ids), cfg.account)
-        if contains(cfg.trusted_oidc_repos, each.key)
       ])
-      error_message = "Repo ${each.key}: state_account (${each.value.state_account}), every assume_existing_roles key, and the account of every custom role trusting this repo must exist in account_ids."
+      error_message = "Repo ${each.key}: state_account (${each.value.state_account}) and every assume_existing_roles key must exist in account_ids."
     }
   }
 }

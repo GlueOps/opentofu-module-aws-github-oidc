@@ -139,21 +139,6 @@ run "org_override" {
   }
 }
 
-run "legacy_sub_pattern_opt_in" {
-  command = plan
-
-  variables {
-    immutable_subs_only = false
-  }
-
-  assert {
-    condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
-      "repo:Example-Org/demo-app:ref:refs/heads/main",
-      "repo:Example-Org@1234567/demo-app@9876543:ref:refs/heads/main",
-    ]
-    error_message = "with immutable_subs_only = false the legacy-format equivalents must be included too"
-  }
-}
 
 run "explicit_null_allowed_subs" {
   command = plan

@@ -42,7 +42,7 @@ output "sub_account_inputs" {
       state_prefix       = local.state_prefixes[repo]
       tags               = local.tags[repo]
     } if cfg.state_account == acct }
-    custom_roles = { for key, cfg in var.custom_roles : key => {
+    custom_roles = { for key, cfg in local.custom_roles_flat : key => {
       role_name          = local.custom_role_names[key]
       policy_arns        = cfg.policy_arns
       inline_policy      = cfg.inline_policy

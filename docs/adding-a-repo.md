@@ -26,8 +26,8 @@ In the config that calls this module, append to `github_repos`:
 
 Everything else (org, state account, default branch, PR access) comes from `github_org` /
 `repo_defaults` — add a field to the entry only to deviate. If the repo needs custom
-scoped roles in a sub-account, also add a `custom_roles` entry
-(`"<account>--<RoleName>"`) listing the repo in `trusted_oidc_repos`.
+scoped roles in another account, also add an entry under `custom_roles[account]`
+listing the repo in `trusted_oidc_repos`.
 
 ## 3. Apply and read the plan
 

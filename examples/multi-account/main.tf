@@ -63,10 +63,11 @@ module "github_oidc" {
   # Purpose-built roles this module pair CREATES and grants. platform-app can
   # only touch Route53 in the dns account.
   custom_roles = {
-    "dns--Route53Only" = {
-      account            = "dns"
-      policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
-      trusted_oidc_repos = ["platform-app"]
+    dns = {
+      Route53Only = {
+        policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
+        trusted_oidc_repos = ["platform-app"]
+      }
     }
   }
 }
