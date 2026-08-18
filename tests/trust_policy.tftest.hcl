@@ -10,6 +10,16 @@ variables {
       state_account  = "state"
       infra_accounts = {}
     }
+    # Declared-but-null allowed_subs must behave exactly like omitting it.
+    "null-subs-app" = {
+      github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876545"
+      policy_arns    = []
+      state_account  = "state"
+      infra_accounts = {}
+      allowed_subs   = null
+    }
     "scoped-app" = {
       github_org     = "Example-Org"
       github_org_id  = "1234567"
@@ -87,6 +97,15 @@ run "legacy_sub_pattern_opt_in" {
       "repo:Example-Org@1234567/*",
     ]
     error_message = "with immutable_subs_only = false the legacy name-based pattern must be included too"
+  }
+}
+
+run "explicit_null_allowed_subs" {
+  command = plan
+
+  assert {
+    condition     = jsondecode(aws_iam_role.github_oidc["null-subs-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"]
+    error_message = "allowed_subs = null must produce the same default sub patterns as omitting the attribute"
   }
 }
 
