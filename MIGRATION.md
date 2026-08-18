@@ -14,7 +14,9 @@ any repo, branch, or event) to per-repo: only workflows on the repo's default br
 - `allowed_subs` and the ID-claim enforcement are unchanged; repos that set
   `allowed_subs` are unaffected by all of the above.
 - With `immutable_subs_only = false`, legacy-format equivalents of the default patterns
-  are included (also branch-scoped — no longer org-wide).
+  are included (also branch-scoped — no longer org-wide). The variable is now
+  **deprecated**: opt your repos into immutable subject claims instead; it will be
+  removed in a future major version.
 
 # Migrating from v1.x to v2.0.0
 
