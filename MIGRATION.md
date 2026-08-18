@@ -1,3 +1,19 @@
+# Migrating from v2.x to v3.0.0
+
+v3.0.0 tightens the **default** trust-policy sub scope from org-wide (`repo:ORG@ID/*` —
+any repo, branch, or event) to per-repo: only workflows on the repo's default branch
+(`default_branch`, default `"main"`) plus pull_request-triggered runs.
+
+- If your workflows deploy from `main` (or the branch set in `default_branch`) and plan on
+  PRs, no changes are needed. Applying updates each trust policy in place.
+- Repos deploying from other branches, from tags, or via environment-gated jobs will
+  **fail closed** under the new default — set `allowed_subs` (or `default_branch`) for
+  those repos before bumping.
+- `allowed_subs` and the ID-claim enforcement are unchanged; repos that set
+  `allowed_subs` are unaffected.
+- With `immutable_subs_only = false`, legacy-format equivalents of the two default
+  patterns are included (also branch-scoped — no longer org-wide).
+
 # Migrating from v1.x to v2.0.0
 
 v2.0.0 defaults trust policies to **immutable-only** sub patterns and replaces the

@@ -1,5 +1,5 @@
 variable "github_repos" {
-  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment)."
+  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). By default the trust policy accepts workflows on the repo's default branch (`default_branch`, default \"main\") plus pull_request-triggered runs; `allowed_subs` replaces those default sub-claim patterns entirely (e.g. to add environments or drop PR access)."
   type = map(object({
     github_org     = string
     github_org_id  = string
@@ -7,6 +7,7 @@ variable "github_repos" {
     policy_arns    = list(string)
     state_account  = string
     infra_accounts = map(string)
+    default_branch = optional(string, "main")
     allowed_subs   = optional(list(string))
   }))
 

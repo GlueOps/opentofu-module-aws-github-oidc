@@ -20,6 +20,15 @@ variables {
       infra_accounts = {}
       allowed_subs   = null
     }
+    "master-app" = {
+      github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876546"
+      policy_arns    = []
+      state_account  = "state"
+      infra_accounts = {}
+      default_branch = "master"
+    }
     "scoped-app" = {
       github_org     = "Example-Org"
       github_org_id  = "1234567"
@@ -73,14 +82,26 @@ run "id_claim_conditions" {
 run "default_sub_patterns" {
   command = plan
 
-  # IAM's secure-by-default guardrail for the GitHub OIDC provider requires a
-  # non-wildcard-only sub condition; the default matches the immutable format
-  # org-wide (the ID StringEquals conditions above are the real enforcement).
+  # Default scope: the repo's default branch plus pull_request-triggered runs
+  # (the ID StringEquals conditions above are the real enforcement).
   assert {
     condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
-      "repo:Example-Org@1234567/*",
+      "repo:Example-Org@1234567/demo-app@9876543:ref:refs/heads/main",
+      "repo:Example-Org@1234567/demo-app@9876543:pull_request",
     ]
-    error_message = "default sub pattern must be immutable-format only, org-scoped"
+    error_message = "default sub patterns must scope to the default branch plus pull_request runs, immutable format"
+  }
+}
+
+run "default_branch_override" {
+  command = plan
+
+  assert {
+    condition = jsondecode(aws_iam_role.github_oidc["master-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
+      "repo:Example-Org@1234567/master-app@9876546:ref:refs/heads/master",
+      "repo:Example-Org@1234567/master-app@9876546:pull_request",
+    ]
+    error_message = "default_branch must change the branch ref in the default sub patterns"
   }
 }
 
@@ -93,10 +114,12 @@ run "legacy_sub_pattern_opt_in" {
 
   assert {
     condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
-      "repo:Example-Org/*",
-      "repo:Example-Org@1234567/*",
+      "repo:Example-Org/demo-app:ref:refs/heads/main",
+      "repo:Example-Org/demo-app:pull_request",
+      "repo:Example-Org@1234567/demo-app@9876543:ref:refs/heads/main",
+      "repo:Example-Org@1234567/demo-app@9876543:pull_request",
     ]
-    error_message = "with immutable_subs_only = false the legacy name-based pattern must be included too"
+    error_message = "with immutable_subs_only = false the legacy-format equivalents must be included too"
   }
 }
 
@@ -104,7 +127,10 @@ run "explicit_null_allowed_subs" {
   command = plan
 
   assert {
-    condition     = jsondecode(aws_iam_role.github_oidc["null-subs-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"]
+    condition = jsondecode(aws_iam_role.github_oidc["null-subs-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
+      "repo:Example-Org@1234567/null-subs-app@9876545:ref:refs/heads/main",
+      "repo:Example-Org@1234567/null-subs-app@9876545:pull_request",
+    ]
     error_message = "allowed_subs = null must produce the same default sub patterns as omitting the attribute"
   }
 }
