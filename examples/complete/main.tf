@@ -15,6 +15,7 @@ module "github_oidc" {
       policy_arns    = []
       state_account  = "state"
       infra_accounts = { core = "OrganizationAccountAccessRole" }
+      allowed_subs   = null # declared-but-unused: org-wide default sub patterns apply
     }
 
     # Managed policies in the management account, sub scoped to main.
