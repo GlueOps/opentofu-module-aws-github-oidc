@@ -64,13 +64,13 @@ module "github_oidc" {
     {
       repo_name      = "my-repo"
       repo_id        = "9876543"
-      infra_accounts = { "my-sub-account" = "OrganizationAccountAccessRole" }
+      assume_existing_roles = { "my-sub-account" = "OrganizationAccountAccessRole" }
     },
     { repo_name = "another-repo", repo_id = "9876544" },
   ]
 
-  sub_account_ids          = { "my-sub-account" = "123456789012", "my-state-account" = "987654321098" }
-  custom_sub_account_roles = {}
+  account_ids          = { "my-sub-account" = "123456789012", "my-state-account" = "987654321098" }
+  custom_roles = {}
 }
 
 module "github_oidc_sub_account" {
@@ -91,7 +91,7 @@ each repo's GitHub Actions workflow needs.
 ## Defaults and overrides
 
 `github_org` and `repo_defaults` apply to every entry in `github_repos`; any per-repo
-field overrides them. `allowed_subs` is deliberately not defaultable — sub-scope overrides
+field overrides them. `override_subs` is deliberately not defaultable — sub-scope overrides
 must stay visible on the repo entry. The idiom is: an entry shows only what deviates, so
 every line in it is a grant or an exception.
 
@@ -113,7 +113,7 @@ renames, transfers, and name recycling, and compatible with both the legacy and 
 post-2026-07-15 immutable `sub` formats. A `sub` condition is kept because IAM requires
 one for the GitHub OIDC provider; it scopes each repo to its default branch (resolved from
 `repo_defaults.default_branch` or the entry's `default_branch`), with pull\_request-triggered
-runs opt-in per repo and `allowed_subs` replacing it entirely. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
+runs opt-in per repo and `override_subs` replacing it entirely. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
 behavioral details (transfers fail closed until IDs are updated).
 
 Scope: GitHub.com only (GHES/data-residency tenants use a different issuer); the ID
@@ -122,17 +122,17 @@ condition keys are supported by AWS in commercial partitions.
 ## One repo, many accounts
 
 Every repo gets exactly one management-account role; multi-account access is just the
-list of downstream ARNs that role may assume. `infra_accounts` adds pre-existing roles to
-that list (declared on the repo entry), `custom_sub_account_roles` creates new scoped
+list of downstream ARNs that role may assume. `assume_existing_roles` adds pre-existing roles to
+that list (declared on the repo entry), `custom_roles` creates new scoped
 roles and adds them (declared on the role, via `trusted_oidc_repos`), and the state role
 is added automatically. `workflow_config[repo]` shows the resulting list.
 
 The two mechanisms differ by **ownership**, and can mix freely on one repo:
 
-- **`infra_accounts`** — points at roles that **already exist** in each account
+- **`assume_existing_roles`** — points at roles that **already exist** in each account
   (e.g. `OrganizationAccountAccessRole`); nothing is created, and the role name — and
   therefore the permission set — can differ per account. Typically broad.
-- **`custom_sub_account_roles`** — declares roles **this module pair creates** with
+- **`custom_roles`** — declares roles **this module pair creates** with
   exactly the policies you give them; list the repo in `trusted_oidc_repos` and the
   grant is generated automatically. Typically narrow.
 
@@ -143,13 +143,13 @@ Note the grant direction flips between them: grants for existing roles live on t
 github_repos = [{
   repo_name      = "platform-app"
   repo_id        = "9876543"
-  infra_accounts = {
+  assume_existing_roles = {
     workloads-prod    = "OrganizationAccountAccessRole" # broad
     workloads-staging = "StagingDeployRole"             # different role per account
   }
 }]
 
-custom_sub_account_roles = {
+custom_roles = {
   "dns--Route53Only" = {                                # scoped
     account            = "dns"
     policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
@@ -166,11 +166,11 @@ the complete configuration.
 
 ## Custom sub-account roles
 
-Roles declared in `custom_sub_account_roles` are created by the sub-account module; this
+Roles declared in `custom_roles` are created by the sub-account module; this
 module automatically grants each repo listed in a role's `trusted_oidc_repos` permission to
 assume it — no hand-written grant policies needed in the caller.
 
-## Branch / environment scoping (`allowed_subs`)
+## Branch / environment scoping (`override_subs`)
 
 By default a repo's role is assumable only by workflows on the repo's default branch
 (resolved from `repo_defaults.default_branch` or the entry's `default_branch`):
@@ -188,11 +188,11 @@ repo:MyOrg@1234567/my-repo@9876543:pull_request
 ```
 
 Workflows on other branches, tags, or environment-gated jobs (`...:environment:NAME`) are
-always rejected by default. To scope a repo differently, set `allowed_subs` with exact sub
+always rejected by default. To scope a repo differently, set `override_subs` with exact sub
 patterns (immutable format, matched as minted by the repo) — it replaces the defaults
 entirely, e.g. to allow an environment add its `...:environment:NAME` sub.
 
-`allowed_subs = null` behaves exactly like omitting the attribute (the default patterns
+`override_subs = null` behaves exactly like omitting the attribute (the default patterns
 apply). With `repo_defaults` in play, prefer omitting defaults entirely: an entry should
 show only what deviates.
 
@@ -246,12 +246,12 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_custom_sub_account_roles"></a> [custom\_sub\_account\_roles](#input\_custom\_sub\_account\_roles) | Custom roles to create in sub-accounts | <pre>map(object({<br/>    account            = string<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  }))</pre> | `{}` | no |
+| <a name="input_account_ids"></a> [account\_ids](#input\_account\_ids) | Map of account name to account ID for every account referenced by state\_account, assume\_existing\_roles, or custom\_roles — including the management account when roles live there. | `map(string)` | n/a | yes |
+| <a name="input_custom_roles"></a> [custom\_roles](#input\_custom\_roles) | Scoped roles this module pair creates in the configured accounts and grants to the repos listed in trusted\_oidc\_repos. | <pre>map(object({<br/>    account            = string<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  }))</pre> | `{}` | no |
 | <a name="input_github_org"></a> [github\_org](#input\_github\_org) | Default GitHub organization for all repos: name and immutable numeric ID (gh api orgs/ORG --jq .id). Individual repos may override via their github\_org/github\_org\_id fields (multi-org setups). | <pre>object({<br/>    name = string<br/>    id   = string<br/>  })</pre> | `null` | no |
-| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | GitHub repos to create OIDC roles for. `repo_id` (and, when overriding, `github_org_id`) are the immutable numeric GitHub IDs — find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'. Per-repo values override `github_org` / `repo_defaults`. The trust policy accepts only workflows on the repo's default branch; `allow_pull_requests = true` also accepts pull\_request-triggered runs (required for plan-on-PR pipelines), and `allowed_subs` replaces the default sub-claim patterns entirely. | <pre>list(object({<br/>    repo_name           = string<br/>    repo_id             = string<br/>    github_org          = optional(string)<br/>    github_org_id       = optional(string)<br/>    policy_arns         = optional(list(string), [])<br/>    state_account       = optional(string)<br/>    infra_accounts      = optional(map(string), {})<br/>    default_branch      = optional(string)<br/>    allow_pull_requests = optional(bool)<br/>    allowed_subs        = optional(list(string))<br/>  }))</pre> | n/a | yes |
-| <a name="input_immutable_subs_only"></a> [immutable\_subs\_only](#input\_immutable\_subs\_only) | DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use\_immutable\_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set allowed\_subs. | `bool` | `true` | no |
-| <a name="input_repo_defaults"></a> [repo\_defaults](#input\_repo\_defaults) | Defaults applied to every github\_repos entry unless the entry sets its own value. allowed\_subs is deliberately not defaultable — sub-scope overrides must stay visible per repo. | <pre>object({<br/>    state_account       = optional(string)<br/>    default_branch      = optional(string)<br/>    allow_pull_requests = optional(bool)<br/>  })</pre> | `{}` | no |
-| <a name="input_sub_account_ids"></a> [sub\_account\_ids](#input\_sub\_account\_ids) | Map of sub-account name to account ID (used to build ARNs in inline policies) | `map(string)` | n/a | yes |
+| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | GitHub repos to create OIDC roles for. `repo_id` (and, when overriding, `github_org_id`) are the immutable numeric GitHub IDs — find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'. Per-repo values override `github_org` / `repo_defaults`. The trust policy accepts only workflows on the repo's default branch; `allow_pull_requests = true` also accepts pull\_request-triggered runs (required for plan-on-PR pipelines), and `override_subs` replaces the default sub-claim patterns entirely. | <pre>list(object({<br/>    repo_name             = string<br/>    repo_id               = string<br/>    github_org            = optional(string)<br/>    github_org_id         = optional(string)<br/>    policy_arns           = optional(list(string), [])<br/>    state_account         = optional(string)<br/>    assume_existing_roles = optional(map(string), {})<br/>    default_branch        = optional(string)<br/>    allow_pull_requests   = optional(bool)<br/>    override_subs         = optional(list(string))<br/>  }))</pre> | n/a | yes |
+| <a name="input_immutable_subs_only"></a> [immutable\_subs\_only](#input\_immutable\_subs\_only) | DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use\_immutable\_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set override\_subs. | `bool` | `true` | no |
+| <a name="input_repo_defaults"></a> [repo\_defaults](#input\_repo\_defaults) | Defaults applied to every github\_repos entry unless the entry sets its own value. override\_subs is deliberately not defaultable — sub-scope overrides must stay visible per repo. | <pre>object({<br/>    state_account       = optional(string)<br/>    default_branch      = optional(string)<br/>    allow_pull_requests = optional(bool)<br/>  })</pre> | `{}` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags to apply to all resources | `map(string)` | `{}` | no |
 | <a name="input_thumbprint_list"></a> [thumbprint\_list](#input\_thumbprint\_list) | OIDC thumbprints for GitHub Actions (AWS no longer validates these but the field is required) | `list(string)` | <pre>[<br/>  "6938fd4d98bab03faadb97b34396831e3780aea1",<br/>  "1c58a3a8518e8759bf075b76b750d4f2df264fcd"<br/>]</pre> | no |
 
@@ -266,7 +266,7 @@ No modules.
 | <a name="output_oidc_role_names"></a> [oidc\_role\_names](#output\_oidc\_role\_names) | Map of repo name to OIDC role name in the management account |
 | <a name="output_s3_state_role_names"></a> [s3\_state\_role\_names](#output\_s3\_state\_role\_names) | Map of repo name to computed S3 state role name (for use in sub-accounts) |
 | <a name="output_state_prefixes"></a> [state\_prefixes](#output\_state\_prefixes) | Map of repo name to S3 state file prefix (org/repo, lowercased) |
-| <a name="output_sub_account_inputs"></a> [sub\_account\_inputs](#output\_sub\_account\_inputs) | Per-account inputs for the sub-account module, pre-grouped: pass sub\_account\_inputs[account].repos and .custom\_roles straight through — no consumer-side fan-out glue needed. Every account in sub\_account\_ids has an entry (possibly empty). |
+| <a name="output_sub_account_inputs"></a> [sub\_account\_inputs](#output\_sub\_account\_inputs) | Per-account inputs for the sub-account module, pre-grouped: pass sub\_account\_inputs[account].repos and .custom\_roles straight through — no consumer-side fan-out glue needed. Every account in account\_ids has an entry (possibly empty). |
 | <a name="output_tags"></a> [tags](#output\_tags) | Map of repo name to computed tags |
 | <a name="output_workflow_config"></a> [workflow\_config](#output\_workflow\_config) | Per-repo values a GitHub Actions workflow needs: the role to assume via OIDC, the state-backend role ARN and key prefix, and the downstream role ARNs it may assume. |
 <!-- END_TF_DOCS -->
