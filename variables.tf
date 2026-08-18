@@ -43,6 +43,7 @@ variable "custom_sub_account_roles" {
 }
 
 variable "immutable_subs_only" {
+  deprecated  = "Transitional escape hatch only; opt your repos into immutable subject claims (use_immutable_subject) instead. This variable will be removed in a future major version."
   description = "DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set allowed_subs."
   type        = bool
   default     = true

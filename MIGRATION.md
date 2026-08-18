@@ -15,8 +15,12 @@ any repo, branch, or event) to per-repo: only workflows on the repo's default br
   `allowed_subs` are unaffected by all of the above.
 - With `immutable_subs_only = false`, legacy-format equivalents of the default patterns
   are included (also branch-scoped — no longer org-wide). The variable is now
-  **deprecated**: opt your repos into immutable subject claims instead; it will be
-  removed in a future major version.
+  **deprecated** (native OpenTofu variable deprecation — setting it emits a warning):
+  opt your repos into immutable subject claims instead; it will be removed in a future
+  major version.
+- **The minimum OpenTofu version is now 1.11** (required by the native deprecation
+  attribute), and the module is OpenTofu-only — Terraform does not support it. Bump any
+  CI pins (e.g. an `OPENTOFU_VERSION` variable) to >= 1.11 before adopting v3.
 
 # Migrating from v1.x to v2.0.0
 
