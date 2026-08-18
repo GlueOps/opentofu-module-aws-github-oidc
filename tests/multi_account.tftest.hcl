@@ -72,8 +72,8 @@ run "one_repo_many_accounts" {
   }
 
   assert {
-    condition     = length(output.workflow_config["platform-app"].custom_role_arns) == 2
-    error_message = "workflow_config must list every custom role the repo may assume"
+    condition     = keys(output.workflow_config["platform-app"].custom_role_arns) == ["data--SecurityGroupPatch", "dns--Route53Only"]
+    error_message = "workflow_config must expose every custom role the repo may assume, keyed by role"
   }
 
   # sub_account_inputs materializes the custom roles in their own accounts.

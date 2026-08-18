@@ -40,7 +40,6 @@ module "github_oidc" {
     "core--Route53Access" = {
       account            = "core"
       policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
-      inline_policy      = null
       trusted_oidc_repos = ["demo-app"]
     }
   }

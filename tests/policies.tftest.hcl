@@ -112,8 +112,8 @@ run "workflow_config_output" {
   }
 
   assert {
-    condition     = output.workflow_config["deploy-app"].custom_role_arns == ["arn:aws:iam::111111111111:role/oidc-custom-core--Route53Access"]
-    error_message = "workflow_config must expose the custom role ARNs the repo may assume"
+    condition     = tomap(output.workflow_config["deploy-app"].custom_role_arns) == tomap({ "core--Route53Access" = "arn:aws:iam::111111111111:role/oidc-custom-core--Route53Access" })
+    error_message = "workflow_config must expose the custom role ARNs keyed by role, so workflows can pick one by name"
   }
 }
 

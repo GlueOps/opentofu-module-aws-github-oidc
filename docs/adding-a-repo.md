@@ -43,9 +43,41 @@ Every value the workflow needs is in the `workflow_config` output:
 tofu output -json workflow_config | jq '."my-new-repo"'
 ```
 
-- `role_to_assume` → `aws-actions/configure-aws-credentials` `role-to-assume`
+- `role_to_assume` → `aws-actions/configure-aws-credentials` `role-to-assume` — the
+  ONLY role a workflow ever assumes via OIDC
 - `state_role_arn` → the backend's `role_arn`
 - `state_prefix`   → the backend key prefix (`<state_prefix>/terraform.tfstate`)
+- `infra_role_arns.<account>` → the provider `assume_role` role (or second-hop role)
+  for that account
+- `custom_role_arns.<role>` → scoped roles for chained jobs
+
+### Reaching downstream accounts
+
+Downstream roles (infra, custom, state) trust the repo's **management role**, not the
+OIDC provider — pasting their ARN straight into `role-to-assume` fails. Chain through
+the management role:
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+steps:
+  - uses: aws-actions/configure-aws-credentials@v5
+    with:
+      role-to-assume: ${{ vars.OIDC_ROLE }} # workflow_config: role_to_assume
+      aws-region: us-east-1
+
+  # Second hop — the downstream role this job needs:
+  - uses: aws-actions/configure-aws-credentials@v5
+    with:
+      role-to-assume: ${{ vars.DNS_ROLE }} # workflow_config: custom_role_arns / infra_role_arns
+      role-chaining: true
+      aws-region: us-east-1
+```
+
+For OpenTofu jobs the second hop is usually implicit: put `state_role_arn` in the
+backend's `role_arn` and the infra role in the provider's `assume_role` block — only
+non-tofu jobs (CLI/SDK) need explicit chaining.
 
 ## If AssumeRoleWithWebIdentity fails
 
@@ -55,5 +87,9 @@ tofu output -json workflow_config | jq '."my-new-repo"'
    (or `repo_defaults`) needs `allow_pull_requests = true`.
 3. **Workflow not on the default branch** — only `ref:refs/heads/<default_branch>` runs are
    accepted by default; other branches/tags/environments need `allowed_subs`.
-4. Compare the `expected_subs` output for the repo against the sub the token actually
+4. **Second hop fails (`sts:AssumeRole` denied)** — the downstream role must exist:
+   has the sub-account module been applied in that account? And are you chaining
+   through the management role rather than assuming the downstream role directly via
+   OIDC?
+5. Compare the `expected_subs` output for the repo against the sub the token actually
    carries — they must match one pattern exactly.

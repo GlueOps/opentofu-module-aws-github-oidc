@@ -152,13 +152,13 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
 # hand-written by the caller.
 
 locals {
-  repo_custom_role_arns = { for repo in keys(local.repos) : repo => [
+  repo_custom_role_arns = { for repo in keys(local.repos) : repo => {
     for key, cfg in var.custom_sub_account_roles :
     # "unknown" placeholder never reaches AWS: the precondition below rejects
     # any custom role whose account is missing from sub_account_ids.
-    "arn:aws:iam::${try(var.sub_account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
+    key => "arn:aws:iam::${try(var.sub_account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
     if contains(cfg.trusted_oidc_repos, repo)
-  ] }
+  } }
 }
 
 resource "aws_iam_role_policy" "github_oidc_assume_roles" {
@@ -174,7 +174,7 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
       Resource = concat(
         [for acct, role in each.value.infra_accounts : "arn:aws:iam::${try(var.sub_account_ids[acct], null)}:role/${role}"],
         ["arn:aws:iam::${try(var.sub_account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"],
-        local.repo_custom_role_arns[each.key],
+        values(local.repo_custom_role_arns[each.key]),
       )
     }]
   })
