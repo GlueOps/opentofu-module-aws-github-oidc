@@ -1,14 +1,15 @@
 variable "github_repos" {
-  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). By default the trust policy accepts workflows on the repo's default branch (`default_branch`, default \"main\") plus pull_request-triggered runs; `allowed_subs` replaces those default sub-claim patterns entirely (e.g. to add environments or drop PR access)."
+  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). The trust policy accepts only workflows on the repo's default branch (`default_branch`, required — e.g. \"main\"); set `allow_pull_requests = true` to also accept pull_request-triggered runs (required for plan-on-PR pipelines). `allowed_subs` replaces the default sub-claim patterns entirely."
   type = map(object({
-    github_org     = string
-    github_org_id  = string
-    repo_id        = string
-    policy_arns    = list(string)
-    state_account  = string
-    infra_accounts = map(string)
-    default_branch = optional(string, "main")
-    allowed_subs   = optional(list(string))
+    github_org          = string
+    github_org_id       = string
+    repo_id             = string
+    policy_arns         = list(string)
+    state_account       = string
+    infra_accounts      = map(string)
+    default_branch      = string
+    allow_pull_requests = optional(bool, false)
+    allowed_subs        = optional(list(string))
   }))
 
   validation {
@@ -17,6 +18,11 @@ variable "github_repos" {
       can(regex("^[0-9]+$", cfg.github_org_id)) && can(regex("^[0-9]+$", cfg.repo_id))
     ])
     error_message = "github_org_id and repo_id must be numeric GitHub IDs passed as strings — the REST API numeric ids, not GraphQL node IDs. Find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'."
+  }
+
+  validation {
+    condition     = alltrue([for cfg in values(var.github_repos) : length(cfg.default_branch) > 0])
+    error_message = "default_branch must be a non-empty branch name (e.g. \"main\")."
   }
 }
 

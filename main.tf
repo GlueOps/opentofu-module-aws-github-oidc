@@ -78,11 +78,11 @@ resource "aws_iam_openid_connect_provider" "github" {
 # StringLike is NOT the primary enforcement, but it also satisfies IAM's
 # secure-by-default guardrail for token.actions.githubusercontent.com, which
 # rejects any trust policy without a non-wildcard-only sub condition. Default
-# scope per repo: workflows on the repo's default branch, plus
-# pull_request-triggered runs (PR plans mint a ":pull_request" sub, not the
-# branch ref — dropping that pattern would break plan-on-PR pipelines).
-# Legacy-format equivalents are added when immutable_subs_only = false;
-# allowed_subs replaces the defaults entirely.
+# scope per repo: only workflows on the repo's default branch. PR-triggered
+# runs mint a ":pull_request" sub, not the branch ref, so plan-on-PR pipelines
+# must opt in per repo with allow_pull_requests = true. Legacy-format
+# equivalents are added when immutable_subs_only = false; allowed_subs
+# replaces the defaults entirely.
 
 locals {
   github_oidc_trust = { for repo, cfg in var.github_repos : repo => jsonencode({
@@ -99,14 +99,12 @@ locals {
         }
         StringLike = {
           "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, concat(
-            var.immutable_subs_only ? [] : [
-              "repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}",
-              "repo:${cfg.github_org}/${repo}:pull_request",
-            ],
-            [
-              "repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:ref:refs/heads/${cfg.default_branch}",
-              "repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:pull_request",
-            ],
+            var.immutable_subs_only ? [] : concat(
+              ["repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}"],
+              cfg.allow_pull_requests ? ["repo:${cfg.github_org}/${repo}:pull_request"] : [],
+            ),
+            ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:ref:refs/heads/${cfg.default_branch}"],
+            cfg.allow_pull_requests ? ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:pull_request"] : [],
           ))
         }
       }

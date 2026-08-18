@@ -7,6 +7,7 @@ variables {
       github_org     = "Example-Org"
       github_org_id  = "1234567"
       repo_id        = "9876541"
+      default_branch = "main"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = { core = "DeployRole" }
@@ -16,6 +17,7 @@ variables {
       github_org     = "Example-Org"
       github_org_id  = "1234567"
       repo_id        = "9876542"
+      default_branch = "main"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = {}
@@ -26,6 +28,7 @@ variables {
       github_org     = "Example-Org"
       github_org_id  = "1234567"
       repo_id        = "9876543"
+      default_branch = "main"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = {}

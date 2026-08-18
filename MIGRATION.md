@@ -1,18 +1,20 @@
 # Migrating from v2.x to v3.0.0
 
 v3.0.0 tightens the **default** trust-policy sub scope from org-wide (`repo:ORG@ID/*` —
-any repo, branch, or event) to per-repo: only workflows on the repo's default branch
-(`default_branch`, default `"main"`) plus pull_request-triggered runs.
+any repo, branch, or event) to per-repo: only workflows on the repo's default branch.
 
-- If your workflows deploy from `main` (or the branch set in `default_branch`) and plan on
-  PRs, no changes are needed. Applying updates each trust policy in place.
-- Repos deploying from other branches, from tags, or via environment-gated jobs will
-  **fail closed** under the new default — set `allowed_subs` (or `default_branch`) for
-  those repos before bumping.
+- **`default_branch` is a new required field** on every `github_repos` entry (e.g.
+  `"main"`) — plans fail with a type error until it is added.
+- **Pull-request-triggered runs are rejected by default.** Pipelines that plan on PRs
+  (including the GlueOps OpenTofu CD action's PR plans) must set
+  `allow_pull_requests = true` per repo, or their PR workflows fail closed at
+  AssumeRoleWithWebIdentity.
+- Repos deploying from other branches, from tags, or via environment-gated jobs also
+  fail closed under the new default — set `allowed_subs` for those repos before bumping.
 - `allowed_subs` and the ID-claim enforcement are unchanged; repos that set
-  `allowed_subs` are unaffected.
-- With `immutable_subs_only = false`, legacy-format equivalents of the two default
-  patterns are included (also branch-scoped — no longer org-wide).
+  `allowed_subs` are unaffected by all of the above.
+- With `immutable_subs_only = false`, legacy-format equivalents of the default patterns
+  are included (also branch-scoped — no longer org-wide).
 
 # Migrating from v1.x to v2.0.0
 
