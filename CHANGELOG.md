@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v2.0.1...v3.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* the default sub condition (when allowed_subs is unset) narrows from org-wide repo:ORG@ID/* to two per-repo patterns: workflows on the repo's default branch (new default_branch field, default "main") and pull_request-triggered runs. Repos deploying from other branches, tags, or environment-gated jobs fail closed under the new default — set allowed_subs or default_branch for those before bumping. See MIGRATION.md (v2.x -> v3.0.0).
+
+### Features
+
+* branch-scoped trust-policy subs with opt-in PR access ([#22](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/22)) ([fe6d44b](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/fe6d44b688e626e31efee42330d760e43281c7bf))
+
 ## [2.0.1](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v2.0.0...v2.0.1) (2026-08-18)
 
 
