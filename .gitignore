@@ -1,0 +1,10 @@
+# Local .terraform directories (provider binaries, test workspace)
+.terraform/
+
+# State files (this module is never applied standalone, but just in case)
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
