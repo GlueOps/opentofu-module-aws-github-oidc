@@ -3,15 +3,15 @@ locals {
   # repo_name — every resource for_each below uses these keys, so they must
   # never change shape (state addresses depend on them).
   repos = { for r in var.github_repos : r.repo_name => {
-    repo_id             = r.repo_id
-    github_org          = r.github_org != null ? r.github_org : var.github_org.name
-    github_org_id       = r.github_org_id != null ? r.github_org_id : var.github_org.id
-    policy_arns         = r.policy_arns
-    state_account       = r.state_account != null ? r.state_account : var.repo_defaults.state_account
-    infra_accounts      = r.infra_accounts
-    default_branch      = r.default_branch != null ? r.default_branch : var.repo_defaults.default_branch
-    allow_pull_requests = r.allow_pull_requests != null ? r.allow_pull_requests : coalesce(var.repo_defaults.allow_pull_requests, false)
-    allowed_subs        = r.allowed_subs
+    repo_id               = r.repo_id
+    github_org            = r.github_org != null ? r.github_org : var.github_org.name
+    github_org_id         = r.github_org_id != null ? r.github_org_id : var.github_org.id
+    policy_arns           = r.policy_arns
+    state_account         = r.state_account != null ? r.state_account : var.repo_defaults.state_account
+    assume_existing_roles = r.assume_existing_roles
+    default_branch        = r.default_branch != null ? r.default_branch : var.repo_defaults.default_branch
+    allow_pull_requests   = r.allow_pull_requests != null ? r.allow_pull_requests : coalesce(var.repo_defaults.allow_pull_requests, false)
+    override_subs         = r.override_subs
   } }
 }
 
@@ -43,7 +43,7 @@ locals {
     : "${local.prefixes.s3_state}${substr(repo, 0, local._name.s3_state.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
   }
 
-  custom_role_names = { for key, cfg in var.custom_sub_account_roles : key =>
+  custom_role_names = { for key, cfg in var.custom_roles : key =>
     length("${local.prefixes.custom}${key}") <= local.role_max_length
     ? "${local.prefixes.custom}${key}"
     : "${local.prefixes.custom}${substr(key, 0, local._name.custom.max_trunk)}${local.hash_separator}${substr(sha256(key), 0, local.hash_suffix_length)}"
@@ -88,11 +88,11 @@ resource "aws_iam_openid_connect_provider" "github" {
 # scope per repo: only workflows on the repo's default branch. PR-triggered
 # runs mint a ":pull_request" sub, not the branch ref, so plan-on-PR pipelines
 # must opt in per repo with allow_pull_requests = true. Legacy-format
-# equivalents are added when immutable_subs_only = false; allowed_subs
+# equivalents are added when immutable_subs_only = false; override_subs
 # replaces the defaults entirely.
 
 locals {
-  sub_patterns = { for repo, cfg in local.repos : repo => coalesce(cfg.allowed_subs, concat(
+  sub_patterns = { for repo, cfg in local.repos : repo => coalesce(cfg.override_subs, concat(
     var.immutable_subs_only ? [] : concat(
       ["repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}"],
       cfg.allow_pull_requests ? ["repo:${cfg.github_org}/${repo}:pull_request"] : [],
@@ -153,10 +153,10 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
 
 locals {
   repo_custom_role_arns = { for repo in keys(local.repos) : repo => {
-    for key, cfg in var.custom_sub_account_roles :
+    for key, cfg in var.custom_roles :
     # "unknown" placeholder never reaches AWS: the precondition below rejects
-    # any custom role whose account is missing from sub_account_ids.
-    key => "arn:aws:iam::${try(var.sub_account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
+    # any custom role whose account is missing from account_ids.
+    key => "arn:aws:iam::${try(var.account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
     if contains(cfg.trusted_oidc_repos, repo)
   } }
 }
@@ -172,8 +172,8 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
       Effect = "Allow"
       Action = "sts:AssumeRole"
       Resource = concat(
-        [for acct, role in each.value.infra_accounts : "arn:aws:iam::${try(var.sub_account_ids[acct], null)}:role/${role}"],
-        ["arn:aws:iam::${try(var.sub_account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"],
+        [for acct, role in each.value.assume_existing_roles : "arn:aws:iam::${try(var.account_ids[acct], null)}:role/${role}"],
+        ["arn:aws:iam::${try(var.account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"],
         values(local.repo_custom_role_arns[each.key]),
       )
     }]
@@ -181,14 +181,14 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
 
   lifecycle {
     precondition {
-      condition = contains(keys(var.sub_account_ids), each.value.state_account) && alltrue([
-        for acct in keys(each.value.infra_accounts) : contains(keys(var.sub_account_ids), acct)
+      condition = contains(keys(var.account_ids), each.value.state_account) && alltrue([
+        for acct in keys(each.value.assume_existing_roles) : contains(keys(var.account_ids), acct)
         ]) && alltrue([
-        for key, cfg in var.custom_sub_account_roles :
-        contains(keys(var.sub_account_ids), cfg.account)
+        for key, cfg in var.custom_roles :
+        contains(keys(var.account_ids), cfg.account)
         if contains(cfg.trusted_oidc_repos, each.key)
       ])
-      error_message = "Repo ${each.key}: state_account (${each.value.state_account}), every infra_accounts key, and the account of every custom role trusting this repo must exist in sub_account_ids."
+      error_message = "Repo ${each.key}: state_account (${each.value.state_account}), every assume_existing_roles key, and the account of every custom role trusting this repo must exist in account_ids."
     }
   }
 }

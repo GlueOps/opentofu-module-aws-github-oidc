@@ -8,7 +8,7 @@ variables {
     { repo_name = "demo-app", repo_id = "9876543" },
   ]
 
-  sub_account_ids = { state = "222222222222" }
+  account_ids = { state = "222222222222" }
 }
 
 run "oidc_provider" {

@@ -13,11 +13,11 @@ variables {
       repo_name = "demo-app"
       repo_id   = "9876543"
     },
-    # Declared-but-null allowed_subs must behave exactly like omitting it.
+    # Declared-but-null override_subs must behave exactly like omitting it.
     {
-      repo_name    = "null-subs-app"
-      repo_id      = "9876545"
-      allowed_subs = null
+      repo_name     = "null-subs-app"
+      repo_id       = "9876545"
+      override_subs = null
     },
     {
       repo_name      = "master-app"
@@ -30,9 +30,9 @@ variables {
       allow_pull_requests = true
     },
     {
-      repo_name    = "scoped-app"
-      repo_id      = "9876544"
-      allowed_subs = ["repo:Example-Org@1234567/scoped-app@9876544:ref:refs/heads/main"]
+      repo_name     = "scoped-app"
+      repo_id       = "9876544"
+      override_subs = ["repo:Example-Org@1234567/scoped-app@9876544:ref:refs/heads/main"]
     },
     # Per-repo org override (multi-org support).
     {
@@ -43,7 +43,7 @@ variables {
     },
   ]
 
-  sub_account_ids = { state = "222222222222" }
+  account_ids = { state = "222222222222" }
 }
 
 run "id_claim_conditions" {
@@ -162,7 +162,7 @@ run "explicit_null_allowed_subs" {
     condition = jsondecode(aws_iam_role.github_oidc["null-subs-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
       "repo:Example-Org@1234567/null-subs-app@9876545:ref:refs/heads/main",
     ]
-    error_message = "allowed_subs = null must produce the same default sub patterns as omitting the attribute"
+    error_message = "override_subs = null must produce the same default sub patterns as omitting the attribute"
   }
 }
 
@@ -173,11 +173,11 @@ run "allowed_subs_override" {
     condition = jsondecode(aws_iam_role.github_oidc["scoped-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
       "repo:Example-Org@1234567/scoped-app@9876544:ref:refs/heads/main",
     ]
-    error_message = "allowed_subs must replace the default sub patterns"
+    error_message = "override_subs must replace the default sub patterns"
   }
 
   assert {
     condition     = jsondecode(aws_iam_role.github_oidc["scoped-app"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:repository_id"] == "9876544"
-    error_message = "allowed_subs must not disable the ID claim conditions"
+    error_message = "override_subs must not disable the ID claim conditions"
   }
 }

@@ -11,9 +11,9 @@ variables {
   github_repos = [
     # Short name: fits every prefix untruncated.
     {
-      repo_name      = "demo-app"
-      repo_id        = "9876543"
-      infra_accounts = { core = "DeployRole" }
+      repo_name             = "demo-app"
+      repo_id               = "9876543"
+      assume_existing_roles = { core = "DeployRole" }
     },
     # 65 chars: overflows every prefix -> truncated + 8-hex sha256 suffix.
     {
@@ -28,12 +28,12 @@ variables {
     },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     state = "222222222222"
     core  = "111111111111"
   }
 
-  custom_sub_account_roles = {
+  custom_roles = {
     "core--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" = {
       account            = "core"
       policy_arns        = []

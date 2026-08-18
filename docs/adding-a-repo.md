@@ -20,13 +20,13 @@ In the config that calls this module, append to `github_repos`:
 {
   repo_name      = "my-new-repo"
   repo_id        = "9876543"
-  infra_accounts = { "target-account" = "OrganizationAccountAccessRole" } # if it deploys infra
+  assume_existing_roles = { "target-account" = "OrganizationAccountAccessRole" } # if it deploys infra
 }
 ```
 
 Everything else (org, state account, default branch, PR access) comes from `github_org` /
 `repo_defaults` — add a field to the entry only to deviate. If the repo needs custom
-scoped roles in a sub-account, also add a `custom_sub_account_roles` entry
+scoped roles in a sub-account, also add a `custom_roles` entry
 (`"<account>--<RoleName>"`) listing the repo in `trusted_oidc_repos`.
 
 ## 3. Apply and read the plan
@@ -47,7 +47,7 @@ tofu output -json workflow_config | jq '."my-new-repo"'
   ONLY role a workflow ever assumes via OIDC
 - `state_role_arn` → the backend's `role_arn`
 - `state_prefix`   → the backend key prefix (`<state_prefix>/terraform.tfstate`)
-- `infra_role_arns.<account>` → the provider `assume_role` role (or second-hop role)
+- `existing_role_arns.<account>` → the provider `assume_role` role (or second-hop role)
   for that account
 - `custom_role_arns.<role>` → scoped roles for chained jobs
 
@@ -70,7 +70,7 @@ steps:
   # Second hop — the downstream role this job needs:
   - uses: aws-actions/configure-aws-credentials@v5
     with:
-      role-to-assume: ${{ vars.DNS_ROLE }} # workflow_config: custom_role_arns / infra_role_arns
+      role-to-assume: ${{ vars.DNS_ROLE }} # workflow_config: custom_role_arns / existing_role_arns
       role-chaining: true
       aws-region: us-east-1
 ```
@@ -86,7 +86,7 @@ non-tofu jobs (CLI/SDK) need explicit chaining.
 2. **PR-triggered run without PR access** — PR events mint a `:pull_request` sub; the repo
    (or `repo_defaults`) needs `allow_pull_requests = true`.
 3. **Workflow not on the default branch** — only `ref:refs/heads/<default_branch>` runs are
-   accepted by default; other branches/tags/environments need `allowed_subs`.
+   accepted by default; other branches/tags/environments need `override_subs`.
 4. **Second hop fails (`sts:AssumeRole` denied)** — the downstream role must exist:
    has the sub-account module been applied in that account? And are you chaining
    through the management role rather than assuming the downstream role directly via

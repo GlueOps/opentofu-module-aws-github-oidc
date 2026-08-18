@@ -22,7 +22,7 @@ variables {
     },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     state       = "222222222222"
     "alt-state" = "333333333333"
   }

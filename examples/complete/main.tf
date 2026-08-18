@@ -17,26 +17,26 @@ module "github_oidc" {
   github_repos = [
     # Deploys via an infra-account role, state in the state account.
     {
-      repo_name      = "demo-app"
-      repo_id        = "9876543"
-      infra_accounts = { core = "OrganizationAccountAccessRole" }
+      repo_name             = "demo-app"
+      repo_id               = "9876543"
+      assume_existing_roles = { core = "OrganizationAccountAccessRole" }
     },
     # Managed policies in the management account, sub scoped to main only
-    # (allowed_subs replaces the defaults — no PR access for this one).
+    # (override_subs replaces the defaults — no PR access for this one).
     {
-      repo_name    = "org-admin"
-      repo_id      = "9876544"
-      policy_arns  = ["arn:aws:iam::aws:policy/AdministratorAccess"]
-      allowed_subs = ["repo:example-org@1234567/org-admin@9876544:ref:refs/heads/main"]
+      repo_name     = "org-admin"
+      repo_id       = "9876544"
+      policy_arns   = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      override_subs = ["repo:example-org@1234567/org-admin@9876544:ref:refs/heads/main"]
     },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     core  = "111111111111"
     state = "222222222222"
   }
 
-  custom_sub_account_roles = {
+  custom_roles = {
     "core--Route53Access" = {
       account            = "core"
       policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]

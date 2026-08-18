@@ -1,5 +1,5 @@
 # One repo, many accounts: broad "default" roles in some accounts
-# (infra_accounts) and scoped custom roles in others, at the same time.
+# (assume_existing_roles) and scoped custom roles in others, at the same time.
 mock_provider "aws" {}
 
 variables {
@@ -11,7 +11,7 @@ variables {
       repo_name = "platform-app"
       repo_id   = "9876543"
       # Broad, pre-existing roles: a different role name per account.
-      infra_accounts = {
+      assume_existing_roles = {
         workloads-prod    = "OrganizationAccountAccessRole"
         workloads-staging = "StagingDeployRole"
       }
@@ -19,7 +19,7 @@ variables {
     { repo_name = "other-app", repo_id = "9876544" },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     state             = "222222222222"
     workloads-prod    = "111111111111"
     workloads-staging = "333333333333"
@@ -28,7 +28,7 @@ variables {
   }
 
   # Scoped custom roles in two further accounts, both trusting the same repo.
-  custom_sub_account_roles = {
+  custom_roles = {
     "dns--Route53Only" = {
       account            = "dns"
       policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
@@ -67,7 +67,7 @@ run "one_repo_many_accounts" {
 
   # workflow_config surfaces every downstream role, grouped by kind.
   assert {
-    condition     = keys(output.workflow_config["platform-app"].infra_role_arns) == ["workloads-prod", "workloads-staging"]
+    condition     = keys(output.workflow_config["platform-app"].existing_role_arns) == ["workloads-prod", "workloads-staging"]
     error_message = "workflow_config must list the infra roles per account"
   }
 

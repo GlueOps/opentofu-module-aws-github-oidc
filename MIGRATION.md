@@ -20,16 +20,28 @@ changes**. Adopting it with equivalent values must produce a "No changes" plan.
   Resource state addresses are still keyed by repo name — no `moved` blocks needed.
 - **New `github_org = { name, id }` and `repo_defaults`** module-level variables supply
   org identity, `state_account`, `default_branch`, and `allow_pull_requests` for every
-  entry; per-repo fields override them. `policy_arns` and `infra_accounts` now default to
-  empty. Strip repeated fields from entries — an entry should show only what deviates.
+  entry; per-repo fields override them. `policy_arns` and `assume_existing_roles`
+  (formerly `infra_accounts`) now default to empty. Strip repeated fields from entries — an entry should show only what deviates.
 - **New outputs**: `sub_account_inputs` (pass `.repos`/`.custom_roles` straight into the
   sub-account module — delete your per-account fan-out for-expressions), `workflow_config`
   (per-repo role/state ARNs + prefix for the repo's workflow), and `expected_subs`
   (debugging aid for AssumeRoleWithWebIdentity failures).
 - **New validations**: unique `repo_name`s; every repo must resolve org/branch/state
-  values; `custom_sub_account_roles` keys must start with `"<account>--"` matching the
-  entry's `account` field, and `trusted_oidc_repos` entries must name declared repos
-  (these last two were previously resource preconditions or unchecked).
+  values; `custom_roles` keys must start with `"<account>--"` matching the entry's
+  `account` field, and `trusted_oidc_repos` entries must name declared repos (these
+  last two were previously resource preconditions or unchecked).
+- **Renames** (mechanical find-and-replace; no resource or state impact):
+
+  | v3 name | v4 name |
+  |---|---|
+  | `sub_account_ids` | `account_ids` |
+  | `infra_accounts` (per repo) | `assume_existing_roles` |
+  | `custom_sub_account_roles` | `custom_roles` |
+  | `allowed_subs` | `override_subs` |
+  | `workflow_config.infra_role_arns` | `workflow_config.existing_role_arns` |
+
+  Deployed AWS role names (`github-oidc-*`, `oidc-s3-state-*`, `oidc-custom-*`) are
+  unchanged — renaming deployed IAM roles would be destructive churn for no gain.
 - `immutable_subs_only` remains, still deprecated; its removal is now planned for v5.
 
 # Migrating from v2.x to v3.0.0

@@ -46,14 +46,14 @@ module "github_oidc" {
 
       # Pre-existing roles this repo may assume — the role (and therefore the
       # permissions) can differ per account. Nothing is created here.
-      infra_accounts = {
+      assume_existing_roles = {
         workloads-prod    = "OrganizationAccountAccessRole" # full admin in prod
         workloads-staging = "StagingDeployRole"             # narrower, pre-existing
       }
     },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     state             = "222222222222"
     workloads-prod    = "111111111111"
     workloads-staging = "333333333333"
@@ -62,7 +62,7 @@ module "github_oidc" {
 
   # Purpose-built roles this module pair CREATES and grants. platform-app can
   # only touch Route53 in the dns account.
-  custom_sub_account_roles = {
+  custom_roles = {
     "dns--Route53Only" = {
       account            = "dns"
       policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
@@ -87,7 +87,7 @@ module "github_oidc_sub_account" {
 # Everything platform-app's workflow needs — including every downstream role
 # ARN it may assume, grouped by kind:
 #   role_to_assume, state_role_arn, state_prefix,
-#   infra_role_arns  = { workloads-prod = "...", workloads-staging = "..." }
+#   existing_role_arns  = { workloads-prod = "...", workloads-staging = "..." }
 #   custom_role_arns = { "dns--Route53Only" = "..." }
 output "platform_app_workflow" {
   value = module.github_oidc.workflow_config["platform-app"]

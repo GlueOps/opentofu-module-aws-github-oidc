@@ -19,18 +19,18 @@ variables {
     # Repo without managed policies: inline policy covers its infra accounts,
     # its s3-state role, and the custom role that trusts it.
     {
-      repo_name      = "deploy-app"
-      repo_id        = "9876542"
-      infra_accounts = { core = "OrganizationAccountAccessRole" }
+      repo_name             = "deploy-app"
+      repo_id               = "9876542"
+      assume_existing_roles = { core = "OrganizationAccountAccessRole" }
     },
   ]
 
-  sub_account_ids = {
+  account_ids = {
     state = "222222222222"
     core  = "111111111111"
   }
 
-  custom_sub_account_roles = {
+  custom_roles = {
     "core--Route53Access" = {
       account            = "core"
       policy_arns        = []
@@ -107,7 +107,7 @@ run "workflow_config_output" {
   }
 
   assert {
-    condition     = output.workflow_config["deploy-app"].infra_role_arns["core"] == "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
+    condition     = output.workflow_config["deploy-app"].existing_role_arns["core"] == "arn:aws:iam::111111111111:role/OrganizationAccountAccessRole"
     error_message = "workflow_config must expose infra role ARNs keyed by account"
   }
 
@@ -122,7 +122,7 @@ run "sub_account_inputs_output" {
 
   assert {
     condition     = keys(output.sub_account_inputs) == ["core", "state"]
-    error_message = "sub_account_inputs must have an entry for every account in sub_account_ids"
+    error_message = "sub_account_inputs must have an entry for every account in account_ids"
   }
 
   assert {
