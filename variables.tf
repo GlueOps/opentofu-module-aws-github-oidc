@@ -35,8 +35,8 @@ variable "custom_sub_account_roles" {
   default = {}
 }
 
-variable "include_legacy_sub_pattern" {
-  description = "Include the legacy name-based sub pattern (repo:ORG/*) in the default trust-policy sub condition. Set to false once every configured repo mints immutable subject claims (created after 2026-07-15, or opted in via the use_immutable_subject OIDC setting) to drop the name-based pattern entirely. Has no effect on repos that set allowed_subs."
+variable "immutable_subs_only" {
+  description = "When true (default), the default trust-policy sub condition uses only the immutable repo:ORG@ID/* pattern. Set to false to also include the legacy name-based repo:ORG/* pattern — needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting). Has no effect on repos that set allowed_subs."
   type        = bool
   default     = true
 }

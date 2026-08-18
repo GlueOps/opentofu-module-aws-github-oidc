@@ -64,29 +64,29 @@ run "default_sub_patterns" {
   command = plan
 
   # IAM's secure-by-default guardrail for the GitHub OIDC provider requires a
-  # non-wildcard-only sub condition; the default matches both sub formats
+  # non-wildcard-only sub condition; the default matches the immutable format
   # org-wide (the ID StringEquals conditions above are the real enforcement).
+  assert {
+    condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
+      "repo:Example-Org@1234567/*",
+    ]
+    error_message = "default sub pattern must be immutable-format only, org-scoped"
+  }
+}
+
+run "legacy_sub_pattern_opt_in" {
+  command = plan
+
+  variables {
+    immutable_subs_only = false
+  }
+
   assert {
     condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
       "repo:Example-Org/*",
       "repo:Example-Org@1234567/*",
     ]
-    error_message = "default sub patterns must cover the legacy and immutable formats, org-scoped"
-  }
-}
-
-run "legacy_sub_pattern_disabled" {
-  command = plan
-
-  variables {
-    include_legacy_sub_pattern = false
-  }
-
-  assert {
-    condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
-      "repo:Example-Org@1234567/*",
-    ]
-    error_message = "with include_legacy_sub_pattern = false only the immutable-format pattern must remain"
+    error_message = "with immutable_subs_only = false the legacy name-based pattern must be included too"
   }
 }
 

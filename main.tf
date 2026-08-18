@@ -77,8 +77,9 @@ resource "aws_iam_openid_connect_provider" "github" {
 # sub format, and immune to org/repo renames and name recycling. The sub
 # StringLike is NOT the enforcement — IAM's secure-by-default guardrail for
 # token.actions.githubusercontent.com rejects any trust policy without a
-# non-wildcard-only sub condition, so we match both the legacy and immutable
-# sub formats org-wide by default (overridable per repo via allowed_subs).
+# non-wildcard-only sub condition, so we match the immutable sub format
+# org-wide by default (plus the legacy format when immutable_subs_only = false;
+# overridable per repo via allowed_subs).
 
 locals {
   github_oidc_trust = { for repo, cfg in var.github_repos : repo => jsonencode({
@@ -95,7 +96,7 @@ locals {
         }
         StringLike = {
           "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, concat(
-            var.include_legacy_sub_pattern ? ["repo:${cfg.github_org}/*"] : [],
+            var.immutable_subs_only ? [] : ["repo:${cfg.github_org}/*"],
             ["repo:${cfg.github_org}@${cfg.github_org_id}/*"],
           ))
         }
