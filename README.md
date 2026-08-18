@@ -90,9 +90,9 @@ All role names are auto-generated with a friendly prefix. If the name exceeds 64
 Roles are trusted to the **immutable numeric GitHub IDs** (`repository_owner_id` and
 `repository_id`, exact match) rather than the mutable `org/repo` name — immune to
 renames, transfers, and name recycling, and compatible with both the legacy and the
-post-2026-07-15 immutable `sub` formats. An org-scoped `sub` condition is kept because
-IAM requires one for the GitHub OIDC provider; scope it tighter per repo with
-`allowed_subs`. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
+post-2026-07-15 immutable `sub` formats. A `sub` condition is kept because IAM requires
+one for the GitHub OIDC provider; by default it scopes each repo to its default branch
+plus pull\_request-triggered runs, and `allowed_subs` replaces it per repo. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
 behavioral details (transfers fail closed until IDs are updated).
 
 Scope: GitHub.com only (GHES/data-residency tenants use a different issuer); the ID
@@ -106,22 +106,23 @@ assume it — no hand-written grant policies needed in the caller.
 
 ## Branch / environment scoping (`allowed_subs`)
 
-By default a repo's role is assumable by **any** workflow in that repo (any branch, PR, or
-environment) — enforcement is the immutable ID conditions, and the sub condition is
-org-scoped. To restrict a repo, set `allowed_subs` with exact sub patterns (immutable
-format, since the sub is matched as minted by the repo):
+By default a repo's role is assumable only by workflows on the repo's **default branch**
+(`default_branch`, default `"main"`) and by **pull\_request-triggered** runs:
 
-```hcl
-allowed_subs = [
-  "repo:MyOrg@1234567/my-repo@9876543:ref:refs/heads/main", # deploys from main
-  "repo:MyOrg@1234567/my-repo@9876543:pull_request",        # PR-triggered plans
-]
+```
+repo:MyOrg@1234567/my-repo@9876543:ref:refs/heads/main
+repo:MyOrg@1234567/my-repo@9876543:pull_request
 ```
 
-Note the trade-off: scoping to `ref:refs/heads/main` alone also blocks PR-triggered plan
-workflows, because `pull_request` events mint a `:pull_request` sub context — include both
-patterns (as above) to keep plans on PRs, or omit the second to lock the role to pushes on
-main only. Environment-gated workflows mint `...:environment:NAME`.
+The `:pull_request` pattern is included because PR events mint a `:pull_request` sub
+context rather than a branch ref — without it, plan-on-PR pipelines cannot authenticate.
+Workflows on other branches, tags, or environment-gated jobs (`...:environment:NAME`) are
+rejected by default.
+
+To scope a repo differently, set `allowed_subs` with exact sub patterns (immutable format,
+matched as minted by the repo) — it replaces the defaults entirely. For example, to lock a
+role to pushes on main only (no PR plans), list just the `ref:refs/heads/main` pattern; to
+allow an environment, add its `...:environment:NAME` sub.
 
 A recommended convention is to declare `allowed_subs = null` explicitly on every repo even
 when unused — it keeps the scoping knob visible in the config and makes tightening a
@@ -178,7 +179,7 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_custom_sub_account_roles"></a> [custom\_sub\_account\_roles](#input\_custom\_sub\_account\_roles) | Custom roles to create in sub-accounts | <pre>map(object({<br/>    account            = string<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  }))</pre> | `{}` | no |
-| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment). | <pre>map(object({<br/>    github_org     = string<br/>    github_org_id  = string<br/>    repo_id        = string<br/>    policy_arns    = list(string)<br/>    state_account  = string<br/>    infra_accounts = map(string)<br/>    allowed_subs   = optional(list(string))<br/>  }))</pre> | n/a | yes |
+| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). By default the trust policy accepts workflows on the repo's default branch (`default_branch`, default "main") plus pull\_request-triggered runs; `allowed_subs` replaces those default sub-claim patterns entirely (e.g. to add environments or drop PR access). | <pre>map(object({<br/>    github_org     = string<br/>    github_org_id  = string<br/>    repo_id        = string<br/>    policy_arns    = list(string)<br/>    state_account  = string<br/>    infra_accounts = map(string)<br/>    default_branch = optional(string, "main")<br/>    allowed_subs   = optional(list(string))<br/>  }))</pre> | n/a | yes |
 | <a name="input_immutable_subs_only"></a> [immutable\_subs\_only](#input\_immutable\_subs\_only) | When true (default), the default trust-policy sub condition uses only the immutable repo:ORG@ID/* pattern. Set to false to also include the legacy name-based repo:ORG/* pattern — needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use\_immutable\_subject OIDC setting). Has no effect on repos that set allowed\_subs. | `bool` | `true` | no |
 | <a name="input_sub_account_ids"></a> [sub\_account\_ids](#input\_sub\_account\_ids) | Map of sub-account name to account ID (used to build ARNs in inline policies) | `map(string)` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags to apply to all resources | `map(string)` | `{}` | no |
