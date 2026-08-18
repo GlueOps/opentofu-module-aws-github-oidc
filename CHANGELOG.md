@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v0.1.0...v1.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* each github_repos entry now requires github_org_id and repo_id (numeric GitHub IDs as strings). Trust policies enforce repository_owner_id + repository_id with StringEquals; the sub condition remains (required by IAM for the GitHub OIDC provider) with an org-scoped default matching both legacy and immutable sub formats, overridable per repo via the new allowed_subs field. The inline AssumeRoles policy is now created for every repo, so attaching managed policies no longer removes state-role access. Applying is an in-place trust-policy update: no role recreation, no downtime. See MIGRATION.md.
+
+### Features
+
+* pin trust policies to immutable GitHub numeric IDs ([#14](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/14)) ([011a981](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/011a9819a1b36aa1be9736031f9af6da233ee346))
+
 ## [0.1.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v0.0.1...v0.1.0) (2026-08-18)
 
 
