@@ -1,11 +1,22 @@
 variable "github_repos" {
-  description = "Map of GitHub repo names to their OIDC configuration"
+  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment)."
   type = map(object({
     github_org     = string
+    github_org_id  = string
+    repo_id        = string
     policy_arns    = list(string)
     state_account  = string
     infra_accounts = map(string)
+    allowed_subs   = optional(list(string))
   }))
+
+  validation {
+    condition = alltrue([
+      for cfg in values(var.github_repos) :
+      can(regex("^[0-9]+$", cfg.github_org_id)) && can(regex("^[0-9]+$", cfg.repo_id))
+    ])
+    error_message = "github_org_id and repo_id must be numeric GitHub IDs passed as strings — the REST API numeric ids, not GraphQL node IDs. Find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'."
+  }
 }
 
 variable "sub_account_ids" {

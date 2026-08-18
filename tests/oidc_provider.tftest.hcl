@@ -4,6 +4,8 @@ variables {
   github_repos = {
     "demo-app" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876541"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = {}

@@ -6,6 +6,8 @@ variables {
     # AssumeRoles policy (current v0 behavior).
     "admin-app" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876541"
       policy_arns    = ["arn:aws:iam::aws:policy/AdministratorAccess", "arn:aws:iam::aws:policy/ReadOnlyAccess"]
       state_account  = "state"
       infra_accounts = {}
@@ -14,6 +16,8 @@ variables {
     # covering its infra accounts and its s3-state role.
     "deploy-app" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876542"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = { core = "OrganizationAccountAccessRole" }
@@ -43,11 +47,16 @@ run "managed_policy_attachments" {
 run "inline_assume_roles_policy" {
   command = plan
 
-  # v0 behavior: only repos with zero managed policies get the inline policy.
-  # (v1 will grant state-role access unconditionally; update this run then.)
+  # v1 behavior: EVERY repo gets the inline policy — attaching managed
+  # policies must never silently remove state-backend access.
   assert {
-    condition     = keys(aws_iam_role_policy.github_oidc_assume_roles) == ["deploy-app"]
-    error_message = "inline AssumeRoles policy must exist exactly for repos without managed policies"
+    condition     = keys(aws_iam_role_policy.github_oidc_assume_roles) == ["admin-app", "deploy-app"]
+    error_message = "inline AssumeRoles policy must exist for every repo, managed policies or not"
+  }
+
+  assert {
+    condition     = contains(jsondecode(aws_iam_role_policy.github_oidc_assume_roles["admin-app"].policy).Statement[0].Resource, "arn:aws:iam::222222222222:role/oidc-s3-state-admin-app")
+    error_message = "repos with managed policies must still get state-role access via the inline policy"
   }
 
   assert {

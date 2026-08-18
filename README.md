@@ -44,6 +44,8 @@ module "github_oidc" {
   github_repos = {
     "my-repo" = {
       github_org     = "MyOrg"
+      github_org_id  = "1234567" # numeric owner ID: gh api orgs/MyOrg --jq .id
+      repo_id        = "9876543" # numeric repo ID:  gh api repos/MyOrg/my-repo --jq .id
       policy_arns    = []
       state_account  = "my-state-account"
       infra_accounts = {
@@ -83,6 +85,19 @@ All role names are auto-generated with a friendly prefix. If the name exceeds 64
 | S3 state (sub-account) | `oidc-s3-state-` | `oidc-s3-state-my-repo` |
 | Custom (sub-account) | `oidc-custom-` | `oidc-custom-my-account--Route53Access` |
 
+## Trust policy model (v1)
+
+Roles are trusted to the **immutable numeric GitHub IDs** (`repository_owner_id` and
+`repository_id`, exact match) rather than the mutable `org/repo` name — immune to
+renames, transfers, and name recycling, and compatible with both the legacy and the
+post-2026-07-15 immutable `sub` formats. An org-scoped `sub` condition is kept because
+IAM requires one for the GitHub OIDC provider; scope it tighter per repo with
+`allowed_subs`. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
+behavioral details (transfers fail closed until IDs are updated).
+
+Scope: GitHub.com only (GHES/data-residency tenants use a different issuer); the ID
+condition keys are supported by AWS in commercial partitions.
+
 ## Multi-org support
 
 Each repo specifies its own `github_org`, so repos from different GitHub organizations can coexist in the same configuration.
@@ -98,6 +113,7 @@ Removing a sub-account is a two-step process:
 
 | Name | Version |
 |------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
 
 ## Providers
@@ -118,14 +134,13 @@ No modules.
 | [aws_iam_role.github_oidc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.github_oidc_assume_roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_iam_role_policy_attachment.github_oidc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_iam_policy_document.github_oidc_trust](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_custom_sub_account_roles"></a> [custom\_sub\_account\_roles](#input\_custom\_sub\_account\_roles) | Custom roles to create in sub-accounts | <pre>map(object({<br/>    account            = string<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  }))</pre> | `{}` | no |
-| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration | <pre>map(object({<br/>    github_org     = string<br/>    policy_arns    = list(string)<br/>    state_account  = string<br/>    infra_accounts = map(string)<br/>  }))</pre> | n/a | yes |
+| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment). | <pre>map(object({<br/>    github_org     = string<br/>    github_org_id  = string<br/>    repo_id        = string<br/>    policy_arns    = list(string)<br/>    state_account  = string<br/>    infra_accounts = map(string)<br/>    allowed_subs   = optional(list(string))<br/>  }))</pre> | n/a | yes |
 | <a name="input_sub_account_ids"></a> [sub\_account\_ids](#input\_sub\_account\_ids) | Map of sub-account name to account ID (used to build ARNs in inline policies) | `map(string)` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags to apply to all resources | `map(string)` | `{}` | no |
 | <a name="input_thumbprint_list"></a> [thumbprint\_list](#input\_thumbprint\_list) | OIDC thumbprints for GitHub Actions (AWS no longer validates these but the field is required) | `list(string)` | <pre>[<br/>  "6938fd4d98bab03faadb97b34396831e3780aea1",<br/>  "1c58a3a8518e8759bf075b76b750d4f2df264fcd"<br/>]</pre> | no |

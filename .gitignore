@@ -8,3 +8,6 @@
 # Crash logs
 crash.log
 crash.*.log
+
+# Example workspaces resolve providers in CI; no need to commit their locks
+examples/**/.terraform.lock.hcl
