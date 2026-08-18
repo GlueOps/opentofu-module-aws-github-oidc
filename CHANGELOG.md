@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v4.0.0...v5.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* custom_roles is now account => role name => config (the account field and the '<account>--<RoleName>' key convention are gone; rendered role names, outputs, and sub-account resource addresses are unchanged). immutable_subs_only is removed — trust policies emit only the immutable sub format; repos still on legacy-format tokens must opt into immutable subject claims (or use override_subs) before upgrading. required_version floor drops to >= 1.9. See MIGRATION.md (v4.x -> v5.0.0).
+
+### Features
+
+* nested custom_roles map and immutable-only trust policies ([#26](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/26)) ([f4a3526](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/f4a3526e97d0e6135af83709214821c533355b8b))
+
 ## [4.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v3.0.0...v4.0.0) (2026-08-18)
 
 
