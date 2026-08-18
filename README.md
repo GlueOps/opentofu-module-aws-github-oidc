@@ -104,6 +104,30 @@ Roles declared in `custom_sub_account_roles` are created by the sub-account modu
 module automatically grants each repo listed in a role's `trusted_oidc_repos` permission to
 assume it — no hand-written grant policies needed in the caller.
 
+## Branch / environment scoping (`allowed_subs`)
+
+By default a repo's role is assumable by **any** workflow in that repo (any branch, PR, or
+environment) — enforcement is the immutable ID conditions, and the sub condition is
+org-scoped. To restrict a repo, set `allowed_subs` with exact sub patterns (immutable
+format, since the sub is matched as minted by the repo):
+
+```hcl
+allowed_subs = [
+  "repo:MyOrg@1234567/my-repo@9876543:ref:refs/heads/main", # deploys from main
+  "repo:MyOrg@1234567/my-repo@9876543:pull_request",        # PR-triggered plans
+]
+```
+
+Note the trade-off: scoping to `ref:refs/heads/main` alone also blocks PR-triggered plan
+workflows, because `pull_request` events mint a `:pull_request` sub context — include both
+patterns (as above) to keep plans on PRs, or omit the second to lock the role to pushes on
+main only. Environment-gated workflows mint `...:environment:NAME`.
+
+A recommended convention is to declare `allowed_subs = null` explicitly on every repo even
+when unused — it keeps the scoping knob visible in the config and makes tightening a
+one-line change. `null` behaves exactly like omitting the attribute (the org-wide default
+patterns apply).
+
 ## Legacy sub pattern
 
 By default the trust-policy sub condition uses only the immutable `repo:ORG@ID/*` pattern.
