@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v3.0.0...v4.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* github_repos is now a list of objects with repo_name inside the object (was a map keyed by repo name). New github_org and repo_defaults variables supply org identity and per-repo defaults; entries show only what deviates. New outputs sub_account_inputs (pass straight into the sub-account module — no consumer fan-out glue), workflow_config, and expected_subs. New validations: unique repo_names, resolved org/branch/state per repo, custom-role key/account prefix match, trusted_oidc_repos must name declared repos. Resource state addresses unchanged — adopting with equivalent values plans as "No changes". See MIGRATION.md (v3.x -> v4.0.0).
+
+### Features
+
+* flatten github_repos to a list with module-level defaults ([#24](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/24)) ([d31a6d2](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/d31a6d29b64804d05ea2bb73308be7957976ae96))
+
 ## [3.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v2.0.1...v3.0.0) (2026-08-18)
 
 
