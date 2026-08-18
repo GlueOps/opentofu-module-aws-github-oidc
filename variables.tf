@@ -1,38 +1,80 @@
 variable "github_repos" {
-  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). The trust policy accepts only workflows on the repo's default branch (`default_branch`, required — e.g. \"main\"); set `allow_pull_requests = true` to also accept pull_request-triggered runs (required for plan-on-PR pipelines). `allowed_subs` replaces the default sub-claim patterns entirely."
-  type = map(object({
-    github_org          = string
-    github_org_id       = string
-    repo_id             = string
-    policy_arns         = list(string)
-    state_account       = string
-    infra_accounts      = map(string)
-    default_branch      = string
-    allow_pull_requests = optional(bool, false)
-    allowed_subs        = optional(list(string))
+  description = "GitHub repos to create OIDC roles for. `repo_id` (and, when overriding, `github_org_id`) are the immutable numeric GitHub IDs — find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'. Per-repo values override `github_org` / `repo_defaults`. The trust policy accepts only workflows on the repo's default branch; `allow_pull_requests = true` also accepts pull_request-triggered runs (required for plan-on-PR pipelines), and `override_subs` replaces the default sub-claim patterns entirely."
+  type = list(object({
+    repo_name             = string
+    repo_id               = string
+    github_org            = optional(string)
+    github_org_id         = optional(string)
+    policy_arns           = optional(list(string), [])
+    state_account         = optional(string)
+    assume_existing_roles = optional(map(string), {})
+    default_branch        = optional(string)
+    allow_pull_requests   = optional(bool)
+    override_subs         = optional(list(string))
   }))
 
   validation {
-    condition = alltrue([
-      for cfg in values(var.github_repos) :
-      can(regex("^[0-9]+$", cfg.github_org_id)) && can(regex("^[0-9]+$", cfg.repo_id))
-    ])
-    error_message = "github_org_id and repo_id must be numeric GitHub IDs passed as strings — the REST API numeric ids, not GraphQL node IDs. Find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'."
+    condition     = length(var.github_repos) == length(distinct([for r in var.github_repos : r.repo_name]))
+    error_message = "github_repos: repo_name values must be unique."
   }
 
   validation {
-    condition     = alltrue([for cfg in values(var.github_repos) : length(cfg.default_branch) > 0])
-    error_message = "default_branch must be a non-empty branch name (e.g. \"main\")."
+    condition     = alltrue([for r in var.github_repos : can(regex("^[0-9]+$", r.repo_id))])
+    error_message = "repo_id must be the numeric GitHub repository ID passed as a string — the REST API numeric id, not a GraphQL node ID. Find it with: gh api repos/ORG/REPO --jq .id."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in var.github_repos :
+      (r.github_org != null ? r.github_org : try(var.github_org.name, null)) != null &&
+      can(regex("^[0-9]+$", r.github_org_id != null ? r.github_org_id : try(var.github_org.id, "")))
+    ])
+    error_message = "Every repo must resolve a GitHub org name and numeric org ID — set the module-level github_org = { name, id }, or github_org/github_org_id on the repo entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in var.github_repos :
+      length(r.default_branch != null ? r.default_branch : (var.repo_defaults.default_branch != null ? var.repo_defaults.default_branch : "")) > 0
+    ])
+    error_message = "Every repo must resolve a non-empty default_branch — set repo_defaults.default_branch or default_branch on the repo entry."
+  }
+
+  validation {
+    condition = alltrue([
+      for r in var.github_repos :
+      (r.state_account != null ? r.state_account : var.repo_defaults.state_account) != null
+    ])
+    error_message = "Every repo must resolve a state_account — set repo_defaults.state_account or state_account on the repo entry."
   }
 }
 
-variable "sub_account_ids" {
-  description = "Map of sub-account name to account ID (used to build ARNs in inline policies)"
+variable "github_org" {
+  description = "Default GitHub organization for all repos: name and immutable numeric ID (gh api orgs/ORG --jq .id). Individual repos may override via their github_org/github_org_id fields (multi-org setups)."
+  type = object({
+    name = string
+    id   = string
+  })
+  default = null
+}
+
+variable "repo_defaults" {
+  description = "Defaults applied to every github_repos entry unless the entry sets its own value. override_subs is deliberately not defaultable — sub-scope overrides must stay visible per repo."
+  type = object({
+    state_account       = optional(string)
+    default_branch      = optional(string)
+    allow_pull_requests = optional(bool)
+  })
+  default = {}
+}
+
+variable "account_ids" {
+  description = "Map of account name to account ID for every account referenced by state_account, assume_existing_roles, or custom_roles — including the management account when roles live there."
   type        = map(string)
 }
 
-variable "custom_sub_account_roles" {
-  description = "Custom roles to create in sub-accounts"
+variable "custom_roles" {
+  description = "Scoped roles this module pair creates in the configured accounts and grants to the repos listed in trusted_oidc_repos."
   type = map(object({
     account            = string
     policy_arns        = list(string)
@@ -40,11 +82,24 @@ variable "custom_sub_account_roles" {
     trusted_oidc_repos = list(string)
   }))
   default = {}
+
+  validation {
+    condition = alltrue([
+      for key, cfg in var.custom_roles :
+      alltrue([for r in cfg.trusted_oidc_repos : contains([for gr in var.github_repos : gr.repo_name], r)])
+    ])
+    error_message = "custom_roles: every trusted_oidc_repos entry must match a repo_name in github_repos."
+  }
+
+  validation {
+    condition     = alltrue([for key, cfg in var.custom_roles : startswith(key, "${cfg.account}--")])
+    error_message = "custom_roles: keys must follow \"<account>--<RoleName>\" and the <account> prefix must match the entry's account field (the key names the role; the field places it)."
+  }
 }
 
 variable "immutable_subs_only" {
   deprecated  = "Transitional escape hatch only; opt your repos into immutable subject claims (use_immutable_subject) instead. This variable will be removed in a future major version."
-  description = "DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set allowed_subs."
+  description = "DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set override_subs."
   type        = bool
   default     = true
 }

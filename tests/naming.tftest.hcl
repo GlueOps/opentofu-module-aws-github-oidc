@@ -1,47 +1,40 @@
 mock_provider "aws" {}
 
 variables {
-  github_repos = {
-    # Short name: fits every prefix untruncated.
-    "demo-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876541"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = { core = "DeployRole" }
-    }
-    # 65 chars: overflows every prefix -> truncated + 8-hex sha256 suffix.
-    "platform-infrastructure-deployment-orchestration-service-monorepo" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876542"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-    }
-    # 52 chars: exactly fits the 12-char github-oidc- prefix (64 total) but
-    # overflows the 14-char oidc-s3-state- prefix -> only the s3 name truncates.
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876543"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-    }
+  github_org = { name = "Example-Org", id = "1234567" }
+
+  repo_defaults = {
+    state_account  = "state"
+    default_branch = "main"
   }
 
-  sub_account_ids = {
+  github_repos = [
+    # Short name: fits every prefix untruncated.
+    {
+      repo_name             = "demo-app"
+      repo_id               = "9876543"
+      assume_existing_roles = { core = "DeployRole" }
+    },
+    # 65 chars: overflows every prefix -> truncated + 8-hex sha256 suffix.
+    {
+      repo_name = "platform-infrastructure-deployment-orchestration-service-monorepo"
+      repo_id   = "9876544"
+    },
+    # 52 chars: exactly fits the 12-char github-oidc- prefix (64 total) but
+    # overflows the 14-char oidc-s3-state- prefix -> only the s3 name truncates.
+    {
+      repo_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      repo_id   = "9876545"
+    },
+  ]
+
+  account_ids = {
     state = "222222222222"
     core  = "111111111111"
   }
 
-  custom_sub_account_roles = {
-    "team--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" = {
+  custom_roles = {
+    "core--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" = {
       account            = "core"
       policy_arns        = []
       inline_policy      = null
@@ -109,7 +102,7 @@ run "custom_role_names" {
   command = plan
 
   assert {
-    condition     = output.custom_role_names["team--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"] == "oidc-custom-team--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-13555b5f"
+    condition     = output.custom_role_names["core--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"] == "oidc-custom-core--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-c128ff51"
     error_message = "long custom role key must truncate to prefix + 43 chars + '-' + first 8 hex of sha256(key)"
   }
 }

@@ -43,7 +43,9 @@ jobs:
       - name: Test
         run: tofu test
 
-      - name: Validate example
+      - name: Validate examples
         run: |
-          tofu -chdir=examples/complete init -backend=false
-          tofu -chdir=examples/complete validate
+          for d in examples/*/; do
+            tofu -chdir="$d" init -backend=false
+            tofu -chdir="$d" validate
+          done

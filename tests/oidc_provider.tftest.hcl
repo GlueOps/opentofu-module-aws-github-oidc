@@ -1,19 +1,14 @@
 mock_provider "aws" {}
 
 variables {
-  github_repos = {
-    "demo-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876541"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-    }
-  }
+  github_org    = { name = "Example-Org", id = "1234567" }
+  repo_defaults = { state_account = "state", default_branch = "main" }
 
-  sub_account_ids = { state = "222222222222" }
+  github_repos = [
+    { repo_name = "demo-app", repo_id = "9876543" },
+  ]
+
+  account_ids = { state = "222222222222" }
 }
 
 run "oidc_provider" {
