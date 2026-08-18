@@ -1,3 +1,20 @@
+# Migrating from v1.x to v2.0.0
+
+v2.0.0 defaults trust policies to **immutable-only** sub patterns and replaces the
+v1.1.0 `include_legacy_sub_pattern` variable (removed) with `immutable_subs_only`
+(default `true`, inverted meaning).
+
+- If every configured repo mints immutable subject claims — created after 2026-07-15 or
+  opted in via the `use_immutable_subject` OIDC setting — no changes are needed. Applying
+  updates each role's trust policy in place, dropping the legacy `repo:ORG/*` pattern.
+- If some repos still mint legacy-format tokens, set `immutable_subs_only = false` to keep
+  the legacy pattern until they are opted in. **Do not skip this**: with the default, a
+  non-opted repo's tokens stop matching the sub condition and its deploys fail closed.
+- If you set `include_legacy_sub_pattern` in v1.1.0, replace it: `true` becomes
+  `immutable_subs_only = false`, and `false` becomes the default (remove the argument).
+
+Repos that set `allowed_subs` are unaffected.
+
 # Migrating from v0.x to v1.0.0
 
 v1.0.0 changes how trust policies identify GitHub repositories: instead of matching the
