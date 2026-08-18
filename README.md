@@ -109,6 +109,43 @@ behavioral details (transfers fail closed until IDs are updated).
 Scope: GitHub.com only (GHES/data-residency tenants use a different issuer); the ID
 condition keys are supported by AWS in commercial partitions.
 
+## One repo, many accounts
+
+A single repo can hold different permissions in any number of accounts at once, mixing
+two mechanisms on the same entry:
+
+- **`infra_accounts`** — broad access via roles that already exist in each account
+  (e.g. `OrganizationAccountAccessRole`); the role name — and therefore the permission
+  set — can differ per account.
+- **`custom_sub_account_roles`** — scoped, purpose-built roles this module pair creates
+  (e.g. Route53-only); list the repo in `trusted_oidc_repos` and the grant is generated
+  automatically.
+
+```hcl
+github_repos = [{
+  repo_name      = "platform-app"
+  repo_id        = "9876543"
+  infra_accounts = {
+    workloads-prod    = "OrganizationAccountAccessRole" # broad
+    workloads-staging = "StagingDeployRole"             # different role per account
+  }
+}]
+
+custom_sub_account_roles = {
+  "dns--Route53Only" = {                                # scoped
+    account            = "dns"
+    policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
+    inline_policy      = null
+    trusted_oidc_repos = ["platform-app"]
+  }
+}
+```
+
+The repo's workflow assumes its single management-account role once, then hops to
+whichever downstream role a job needs; `workflow_config["platform-app"]` lists every ARN
+it may assume, grouped by kind. See [examples/multi-account](examples/multi-account) for
+the complete configuration.
+
 ## Custom sub-account roles
 
 Roles declared in `custom_sub_account_roles` are created by the sub-account module; this
