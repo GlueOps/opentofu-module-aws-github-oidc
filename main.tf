@@ -61,31 +61,37 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 # --- Trust policies ---
+#
+# Enforcement is the immutable numeric ID claims (repository_owner_id +
+# repository_id, StringEquals): present in every GitHub.com token regardless of
+# sub format, and immune to org/repo renames and name recycling. The sub
+# StringLike is NOT the enforcement — IAM's secure-by-default guardrail for
+# token.actions.githubusercontent.com rejects any trust policy without a
+# non-wildcard-only sub condition, so we match both the legacy and immutable
+# sub formats org-wide by default (overridable per repo via allowed_subs).
 
-data "aws_iam_policy_document" "github_oidc_trust" {
-  for_each = var.github_repos
-
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
-    principals {
-      type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringLike"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${each.value.github_org}/${each.key}:*"]
-    }
-  }
+locals {
+  github_oidc_trust = { for repo, cfg in var.github_repos : repo => jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRoleWithWebIdentity"
+      Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud"                 = "sts.amazonaws.com"
+          "token.actions.githubusercontent.com:repository_owner_id" = cfg.github_org_id
+          "token.actions.githubusercontent.com:repository_id"       = cfg.repo_id
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, [
+            "repo:${cfg.github_org}/*",
+            "repo:${cfg.github_org}@${cfg.github_org_id}/*",
+          ])
+        }
+      }
+    }]
+  }) }
 }
 
 # --- OIDC Roles ---
@@ -93,7 +99,7 @@ data "aws_iam_policy_document" "github_oidc_trust" {
 resource "aws_iam_role" "github_oidc" {
   for_each           = var.github_repos
   name               = local.role_names[each.key]
-  assume_role_policy = data.aws_iam_policy_document.github_oidc_trust[each.key].json
+  assume_role_policy = local.github_oidc_trust[each.key]
   tags               = local.tags[each.key]
 }
 
@@ -110,10 +116,14 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
   policy_arn = each.value.arn
 }
 
-# --- Inline assume-role policies for non-admin repos ---
+# --- Inline assume-role policies ---
+#
+# Every repo can always assume its own S3 state role, independent of any
+# managed policies attached — attaching a managed policy must never silently
+# remove state-backend access.
 
 resource "aws_iam_role_policy" "github_oidc_assume_roles" {
-  for_each = { for repo, cfg in var.github_repos : repo => cfg if length(cfg.policy_arns) == 0 }
+  for_each = var.github_repos
 
   name = "AssumeRoles"
   role = aws_iam_role.github_oidc[each.key].id
@@ -123,9 +133,18 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
       Effect = "Allow"
       Action = "sts:AssumeRole"
       Resource = concat(
-        [for acct, role in each.value.infra_accounts : "arn:aws:iam::${var.sub_account_ids[acct]}:role/${role}"],
-        ["arn:aws:iam::${var.sub_account_ids[each.value.state_account]}:role/${local.s3_state_role_names[each.key]}"]
+        [for acct, role in each.value.infra_accounts : "arn:aws:iam::${try(var.sub_account_ids[acct], null)}:role/${role}"],
+        ["arn:aws:iam::${try(var.sub_account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"]
       )
     }]
   })
+
+  lifecycle {
+    precondition {
+      condition = contains(keys(var.sub_account_ids), each.value.state_account) && alltrue([
+        for acct in keys(each.value.infra_accounts) : contains(keys(var.sub_account_ids), acct)
+      ])
+      error_message = "Repo ${each.key}: state_account (${each.value.state_account}) and every infra_accounts key must exist in sub_account_ids."
+    }
+  }
 }

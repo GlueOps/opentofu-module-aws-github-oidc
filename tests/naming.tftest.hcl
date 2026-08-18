@@ -5,6 +5,8 @@ variables {
     # Short name: fits every prefix untruncated.
     "demo-app" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876541"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = { core = "DeployRole" }
@@ -12,6 +14,8 @@ variables {
     # 65 chars: overflows every prefix -> truncated + 8-hex sha256 suffix.
     "platform-infrastructure-deployment-orchestration-service-monorepo" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876542"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = {}
@@ -20,6 +24,8 @@ variables {
     # overflows the 14-char oidc-s3-state- prefix -> only the s3 name truncates.
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" = {
       github_org     = "Example-Org"
+      github_org_id  = "1234567"
+      repo_id        = "9876543"
       policy_arns    = []
       state_account  = "state"
       infra_accounts = {}
