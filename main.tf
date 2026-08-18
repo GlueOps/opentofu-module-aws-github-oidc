@@ -58,6 +58,16 @@ resource "aws_iam_openid_connect_provider" "github" {
     { ManagedBy = "opentofu", Purpose = "github-actions-oidc" },
     var.tags,
   )
+
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for key, cfg in var.custom_sub_account_roles :
+        alltrue([for repo in cfg.trusted_oidc_repos : contains(keys(var.github_repos), repo)])
+      ])
+      error_message = "custom_sub_account_roles: every trusted_oidc_repos entry must be a key of github_repos."
+    }
+  }
 }
 
 # --- Trust policies ---
@@ -84,10 +94,10 @@ locals {
           "token.actions.githubusercontent.com:repository_id"       = cfg.repo_id
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, [
-            "repo:${cfg.github_org}/*",
-            "repo:${cfg.github_org}@${cfg.github_org_id}/*",
-          ])
+          "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, concat(
+            var.include_legacy_sub_pattern ? ["repo:${cfg.github_org}/*"] : [],
+            ["repo:${cfg.github_org}@${cfg.github_org_id}/*"],
+          ))
         }
       }
     }]
@@ -120,7 +130,19 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
 #
 # Every repo can always assume its own S3 state role, independent of any
 # managed policies attached — attaching a managed policy must never silently
-# remove state-backend access.
+# remove state-backend access. Custom sub-account roles that list the repo in
+# trusted_oidc_repos are granted here too, so the grant never has to be
+# hand-written by the caller.
+
+locals {
+  repo_custom_role_arns = { for repo in keys(var.github_repos) : repo => [
+    for key, cfg in var.custom_sub_account_roles :
+    # "unknown" placeholder never reaches AWS: the precondition below rejects
+    # any custom role whose account is missing from sub_account_ids.
+    "arn:aws:iam::${try(var.sub_account_ids[cfg.account], "unknown")}:role/${local.custom_role_names[key]}"
+    if contains(cfg.trusted_oidc_repos, repo)
+  ] }
+}
 
 resource "aws_iam_role_policy" "github_oidc_assume_roles" {
   for_each = var.github_repos
@@ -134,7 +156,8 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
       Action = "sts:AssumeRole"
       Resource = concat(
         [for acct, role in each.value.infra_accounts : "arn:aws:iam::${try(var.sub_account_ids[acct], null)}:role/${role}"],
-        ["arn:aws:iam::${try(var.sub_account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"]
+        ["arn:aws:iam::${try(var.sub_account_ids[each.value.state_account], null)}:role/${local.s3_state_role_names[each.key]}"],
+        local.repo_custom_role_arns[each.key],
       )
     }]
   })
@@ -143,8 +166,12 @@ resource "aws_iam_role_policy" "github_oidc_assume_roles" {
     precondition {
       condition = contains(keys(var.sub_account_ids), each.value.state_account) && alltrue([
         for acct in keys(each.value.infra_accounts) : contains(keys(var.sub_account_ids), acct)
+        ]) && alltrue([
+        for key, cfg in var.custom_sub_account_roles :
+        contains(keys(var.sub_account_ids), cfg.account)
+        if contains(cfg.trusted_oidc_repos, each.key)
       ])
-      error_message = "Repo ${each.key}: state_account (${each.value.state_account}) and every infra_accounts key must exist in sub_account_ids."
+      error_message = "Repo ${each.key}: state_account (${each.value.state_account}), every infra_accounts key, and the account of every custom role trusting this repo must exist in sub_account_ids."
     }
   }
 }

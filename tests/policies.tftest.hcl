@@ -28,6 +28,15 @@ variables {
     state = "222222222222"
     core  = "111111111111"
   }
+
+  custom_sub_account_roles = {
+    "core--Route53Access" = {
+      account            = "core"
+      policy_arns        = []
+      inline_policy      = null
+      trusted_oidc_repos = ["deploy-app"]
+    }
+  }
 }
 
 run "managed_policy_attachments" {
@@ -72,5 +81,15 @@ run "inline_assume_roles_policy" {
   assert {
     condition     = jsondecode(aws_iam_role_policy.github_oidc_assume_roles["deploy-app"].policy).Statement[0].Action == "sts:AssumeRole"
     error_message = "inline policy must grant sts:AssumeRole only"
+  }
+
+  assert {
+    condition     = contains(jsondecode(aws_iam_role_policy.github_oidc_assume_roles["deploy-app"].policy).Statement[0].Resource, "arn:aws:iam::111111111111:role/oidc-custom-core--Route53Access")
+    error_message = "repos listed in a custom role's trusted_oidc_repos must be granted sts:AssumeRole on it"
+  }
+
+  assert {
+    condition     = !contains(jsondecode(aws_iam_role_policy.github_oidc_assume_roles["admin-app"].policy).Statement[0].Resource, "arn:aws:iam::111111111111:role/oidc-custom-core--Route53Access")
+    error_message = "repos NOT listed in trusted_oidc_repos must not be granted the custom role"
   }
 }
