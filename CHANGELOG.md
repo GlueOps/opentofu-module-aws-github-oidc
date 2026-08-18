@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v1.0.0...v1.1.0) (2026-08-18)
+
+
+### Features
+
+* auto-grant custom sub-account roles and add include_legacy_sub_pattern ([#16](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/16)) ([8bc1ed9](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/8bc1ed901c3468fa7485adf7b40b0d8a76c822b4))
+
 ## [1.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v0.1.0...v1.0.0) (2026-08-18)
 
 
