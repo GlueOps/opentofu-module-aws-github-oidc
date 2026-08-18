@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v1.1.0...v2.0.0) (2026-08-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* the include_legacy_sub_pattern variable (v1.1.0) is replaced by immutable_subs_only (default true, inverted meaning). By default the trust-policy sub condition now contains only the immutable repo:ORG@ID/* pattern; orgs with repos that still mint legacy-format tokens must set immutable_subs_only = false until those repos opt into immutable subject claims. See MIGRATION.md (v1.x -> v2.0.0).
+
+### Features
+
+* default trust policies to immutable-only sub patterns ([#18](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/18)) ([f087e94](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/f087e94a6918f9ac15b566943924da57a380170a))
+
 ## [1.1.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v1.0.0...v1.1.0) (2026-08-18)
 
 
