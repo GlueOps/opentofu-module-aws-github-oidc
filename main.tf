@@ -1,4 +1,21 @@
 locals {
+  # Per-repo config with github_org / repo_defaults resolved. Keyed by
+  # repo_name — every resource for_each below uses these keys, so they must
+  # never change shape (state addresses depend on them).
+  repos = { for r in var.github_repos : r.repo_name => {
+    repo_id             = r.repo_id
+    github_org          = r.github_org != null ? r.github_org : var.github_org.name
+    github_org_id       = r.github_org_id != null ? r.github_org_id : var.github_org.id
+    policy_arns         = r.policy_arns
+    state_account       = r.state_account != null ? r.state_account : var.repo_defaults.state_account
+    infra_accounts      = r.infra_accounts
+    default_branch      = r.default_branch != null ? r.default_branch : var.repo_defaults.default_branch
+    allow_pull_requests = r.allow_pull_requests != null ? r.allow_pull_requests : coalesce(var.repo_defaults.allow_pull_requests, false)
+    allowed_subs        = r.allowed_subs
+  } }
+}
+
+locals {
   role_max_length    = 64
   hash_suffix_length = 8
   hash_separator     = "-"
@@ -14,13 +31,13 @@ locals {
     max_trunk = local.role_max_length - length(prefix) - local.hash_suffix_length - length(local.hash_separator)
   } }
 
-  role_names = { for repo, cfg in var.github_repos : repo =>
+  role_names = { for repo, cfg in local.repos : repo =>
     length("${local.prefixes.oidc}${repo}") <= local.role_max_length
     ? "${local.prefixes.oidc}${repo}"
     : "${local.prefixes.oidc}${substr(repo, 0, local._name.oidc.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
   }
 
-  s3_state_role_names = { for repo, cfg in var.github_repos : repo =>
+  s3_state_role_names = { for repo, cfg in local.repos : repo =>
     length("${local.prefixes.s3_state}${repo}") <= local.role_max_length
     ? "${local.prefixes.s3_state}${repo}"
     : "${local.prefixes.s3_state}${substr(repo, 0, local._name.s3_state.max_trunk)}${local.hash_separator}${substr(sha256(repo), 0, local.hash_suffix_length)}"
@@ -32,11 +49,11 @@ locals {
     : "${local.prefixes.custom}${substr(key, 0, local._name.custom.max_trunk)}${local.hash_separator}${substr(sha256(key), 0, local.hash_suffix_length)}"
   }
 
-  state_prefixes = { for repo, cfg in var.github_repos : repo =>
+  state_prefixes = { for repo, cfg in local.repos : repo =>
     "${lower(cfg.github_org)}/${lower(repo)}"
   }
 
-  tags = { for repo, cfg in var.github_repos : repo => merge(
+  tags = { for repo, cfg in local.repos : repo => merge(
     {
       ManagedBy  = "opentofu"
       Purpose    = "github-actions-oidc"
@@ -58,16 +75,6 @@ resource "aws_iam_openid_connect_provider" "github" {
     { ManagedBy = "opentofu", Purpose = "github-actions-oidc" },
     var.tags,
   )
-
-  lifecycle {
-    precondition {
-      condition = alltrue([
-        for key, cfg in var.custom_sub_account_roles :
-        alltrue([for repo in cfg.trusted_oidc_repos : contains(keys(var.github_repos), repo)])
-      ])
-      error_message = "custom_sub_account_roles: every trusted_oidc_repos entry must be a key of github_repos."
-    }
-  }
 }
 
 # --- Trust policies ---
@@ -85,7 +92,16 @@ resource "aws_iam_openid_connect_provider" "github" {
 # replaces the defaults entirely.
 
 locals {
-  github_oidc_trust = { for repo, cfg in var.github_repos : repo => jsonencode({
+  sub_patterns = { for repo, cfg in local.repos : repo => coalesce(cfg.allowed_subs, concat(
+    var.immutable_subs_only ? [] : concat(
+      ["repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}"],
+      cfg.allow_pull_requests ? ["repo:${cfg.github_org}/${repo}:pull_request"] : [],
+    ),
+    ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:ref:refs/heads/${cfg.default_branch}"],
+    cfg.allow_pull_requests ? ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:pull_request"] : [],
+  )) }
+
+  github_oidc_trust = { for repo, cfg in local.repos : repo => jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
@@ -98,14 +114,7 @@ locals {
           "token.actions.githubusercontent.com:repository_id"       = cfg.repo_id
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = coalesce(cfg.allowed_subs, concat(
-            var.immutable_subs_only ? [] : concat(
-              ["repo:${cfg.github_org}/${repo}:ref:refs/heads/${cfg.default_branch}"],
-              cfg.allow_pull_requests ? ["repo:${cfg.github_org}/${repo}:pull_request"] : [],
-            ),
-            ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:ref:refs/heads/${cfg.default_branch}"],
-            cfg.allow_pull_requests ? ["repo:${cfg.github_org}@${cfg.github_org_id}/${repo}@${cfg.repo_id}:pull_request"] : [],
-          ))
+          "token.actions.githubusercontent.com:sub" = local.sub_patterns[repo]
         }
       }
     }]
@@ -115,7 +124,7 @@ locals {
 # --- OIDC Roles ---
 
 resource "aws_iam_role" "github_oidc" {
-  for_each           = var.github_repos
+  for_each           = local.repos
   name               = local.role_names[each.key]
   assume_role_policy = local.github_oidc_trust[each.key]
   tags               = local.tags[each.key]
@@ -125,7 +134,7 @@ resource "aws_iam_role" "github_oidc" {
 
 resource "aws_iam_role_policy_attachment" "github_oidc" {
   for_each = { for pair in flatten([
-    for repo, cfg in var.github_repos : [
+    for repo, cfg in local.repos : [
       for arn in cfg.policy_arns : { key = "${repo}--${arn}", repo = repo, arn = arn }
     ]
   ]) : pair.key => pair }
@@ -143,7 +152,7 @@ resource "aws_iam_role_policy_attachment" "github_oidc" {
 # hand-written by the caller.
 
 locals {
-  repo_custom_role_arns = { for repo in keys(var.github_repos) : repo => [
+  repo_custom_role_arns = { for repo in keys(local.repos) : repo => [
     for key, cfg in var.custom_sub_account_roles :
     # "unknown" placeholder never reaches AWS: the precondition below rejects
     # any custom role whose account is missing from sub_account_ids.
@@ -153,7 +162,7 @@ locals {
 }
 
 resource "aws_iam_role_policy" "github_oidc_assume_roles" {
-  for_each = var.github_repos
+  for_each = local.repos
 
   name = "AssumeRoles"
   role = aws_iam_role.github_oidc[each.key].id

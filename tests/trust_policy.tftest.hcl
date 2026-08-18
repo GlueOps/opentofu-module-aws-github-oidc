@@ -1,57 +1,47 @@
 mock_provider "aws" {}
 
 variables {
-  github_repos = {
-    "demo-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876543"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-    }
-    # Declared-but-null allowed_subs must behave exactly like omitting it.
-    "null-subs-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876545"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-      allowed_subs   = null
-    }
-    "master-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876546"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-      default_branch = "master"
-    }
-    "pr-app" = {
-      github_org          = "Example-Org"
-      github_org_id       = "1234567"
-      repo_id             = "9876547"
-      default_branch      = "main"
-      allow_pull_requests = true
-      policy_arns         = []
-      state_account       = "state"
-      infra_accounts      = {}
-    }
-    "scoped-app" = {
-      github_org     = "Example-Org"
-      github_org_id  = "1234567"
-      repo_id        = "9876544"
-      default_branch = "main"
-      policy_arns    = []
-      state_account  = "state"
-      infra_accounts = {}
-      allowed_subs   = ["repo:Example-Org@1234567/scoped-app@9876544:ref:refs/heads/main"]
-    }
+  github_org = { name = "Example-Org", id = "1234567" }
+
+  repo_defaults = {
+    state_account  = "state"
+    default_branch = "main"
   }
+
+  github_repos = [
+    {
+      repo_name = "demo-app"
+      repo_id   = "9876543"
+    },
+    # Declared-but-null allowed_subs must behave exactly like omitting it.
+    {
+      repo_name    = "null-subs-app"
+      repo_id      = "9876545"
+      allowed_subs = null
+    },
+    {
+      repo_name      = "master-app"
+      repo_id        = "9876546"
+      default_branch = "master"
+    },
+    {
+      repo_name           = "pr-app"
+      repo_id             = "9876547"
+      allow_pull_requests = true
+    },
+    {
+      repo_name    = "scoped-app"
+      repo_id      = "9876544"
+      allowed_subs = ["repo:Example-Org@1234567/scoped-app@9876544:ref:refs/heads/main"]
+    },
+    # Per-repo org override (multi-org support).
+    {
+      repo_name     = "other-org-app"
+      repo_id       = "9876548"
+      github_org    = "Other-Org"
+      github_org_id = "7654321"
+    },
+  ]
 
   sub_account_ids = { state = "222222222222" }
 }
@@ -95,13 +85,18 @@ run "id_claim_conditions" {
 run "default_sub_patterns" {
   command = plan
 
-  # Default scope: the repo's default branch plus pull_request-triggered runs
+  # Default scope: the repo's default branch only, immutable format
   # (the ID StringEquals conditions above are the real enforcement).
   assert {
     condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
       "repo:Example-Org@1234567/demo-app@9876543:ref:refs/heads/main",
     ]
     error_message = "default sub pattern must scope to the default branch only (no PR access), immutable format"
+  }
+
+  assert {
+    condition     = tolist(output.expected_subs["demo-app"]) == tolist(["repo:Example-Org@1234567/demo-app@9876543:ref:refs/heads/main"])
+    error_message = "expected_subs must surface the exact sub patterns the trust policy accepts"
   }
 }
 
@@ -125,6 +120,22 @@ run "default_branch_override" {
       "repo:Example-Org@1234567/master-app@9876546:ref:refs/heads/master",
     ]
     error_message = "default_branch must change the branch ref in the default sub patterns"
+  }
+}
+
+run "org_override" {
+  command = plan
+
+  assert {
+    condition     = jsondecode(aws_iam_role.github_oidc["other-org-app"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:repository_owner_id"] == "7654321"
+    error_message = "per-repo github_org_id must override the module-level github_org"
+  }
+
+  assert {
+    condition = jsondecode(aws_iam_role.github_oidc["other-org-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
+      "repo:Other-Org@7654321/other-org-app@9876548:ref:refs/heads/main",
+    ]
+    error_message = "per-repo org override must flow into the sub patterns"
   }
 }
 

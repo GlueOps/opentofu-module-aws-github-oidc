@@ -1,3 +1,37 @@
+# Migrating from v3.x to v4.0.0
+
+v4.0.0 reshapes the interface for readability; **no trust-policy or resource behavior
+changes**. Adopting it with equivalent values must produce a "No changes" plan.
+
+- **`github_repos` is now a list** of objects with `repo_name` inside the object, instead
+  of a map keyed by repo name:
+
+  ```hcl
+  # before                                   # after
+  github_repos = {                           github_repos = [
+    "my-repo" = {                              {
+      github_org_id = "1234567"                  repo_name = "my-repo"
+      repo_id       = "9876543"                  repo_id   = "9876543"
+      ...                                        ...
+    }                                          },
+  }                                          ]
+  ```
+
+  Resource state addresses are still keyed by repo name — no `moved` blocks needed.
+- **New `github_org = { name, id }` and `repo_defaults`** module-level variables supply
+  org identity, `state_account`, `default_branch`, and `allow_pull_requests` for every
+  entry; per-repo fields override them. `policy_arns` and `infra_accounts` now default to
+  empty. Strip repeated fields from entries — an entry should show only what deviates.
+- **New outputs**: `sub_account_inputs` (pass `.repos`/`.custom_roles` straight into the
+  sub-account module — delete your per-account fan-out for-expressions), `workflow_config`
+  (per-repo role/state ARNs + prefix for the repo's workflow), and `expected_subs`
+  (debugging aid for AssumeRoleWithWebIdentity failures).
+- **New validations**: unique `repo_name`s; every repo must resolve org/branch/state
+  values; `custom_sub_account_roles` keys must start with `"<account>--"` matching the
+  entry's `account` field, and `trusted_oidc_repos` entries must name declared repos
+  (these last two were previously resource preconditions or unchecked).
+- `immutable_subs_only` remains, still deprecated; its removal is now planned for v5.
+
 # Migrating from v2.x to v3.0.0
 
 v3.0.0 tightens the **default** trust-policy sub scope from org-wide (`repo:ORG@ID/*` —
