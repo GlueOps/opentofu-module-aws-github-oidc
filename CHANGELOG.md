@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v2.0.0...v2.0.1) (2026-08-18)
+
+
+### Documentation
+
+* document allowed_subs branch scoping and the declare-but-null convention ([#20](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/20)) ([97c3563](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/97c3563c2cf521dc5a127cfc9651e69c8f51436f))
+
 ## [2.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v1.1.0...v2.0.0) (2026-08-18)
 
 
