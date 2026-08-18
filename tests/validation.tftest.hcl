@@ -9,6 +9,7 @@ run "rejects_non_numeric_ids" {
         github_org     = "Example-Org"
         github_org_id  = "1234567"
         repo_id        = "R_kgDOG1234" # GraphQL node ID, not the REST numeric id
+        default_branch = "main"
         policy_arns    = []
         state_account  = "state"
         infra_accounts = {}
@@ -29,6 +30,7 @@ run "rejects_unknown_state_account" {
         github_org     = "Example-Org"
         github_org_id  = "1234567"
         repo_id        = "9876543"
+        default_branch = "main"
         policy_arns    = []
         state_account  = "no-such-account"
         infra_accounts = {}
@@ -49,6 +51,7 @@ run "rejects_unknown_trusted_repo" {
         github_org     = "Example-Org"
         github_org_id  = "1234567"
         repo_id        = "9876543"
+        default_branch = "main"
         policy_arns    = []
         state_account  = "state"
         infra_accounts = {}
@@ -77,6 +80,7 @@ run "rejects_custom_role_with_unknown_account" {
         github_org     = "Example-Org"
         github_org_id  = "1234567"
         repo_id        = "9876543"
+        default_branch = "main"
         policy_arns    = []
         state_account  = "state"
         infra_accounts = {}
@@ -105,6 +109,7 @@ run "rejects_unknown_infra_account" {
         github_org     = "Example-Org"
         github_org_id  = "1234567"
         repo_id        = "9876543"
+        default_branch = "main"
         policy_arns    = []
         state_account  = "state"
         infra_accounts = { "no-such-account" = "DeployRole" }

@@ -1,7 +1,7 @@
 terraform {
-  # optional() is the real floor. The test suite needs OpenTofu >= 1.8
-  # (mock_provider), enforced in CI only — consumers are not constrained by it.
-  required_version = ">= 1.3"
+  # Floor set by the native `deprecated` variable attribute (OpenTofu 1.11+).
+  # This also makes the module OpenTofu-only — Terraform does not support it.
+  required_version = ">= 1.11"
 
   required_providers {
     aws = {

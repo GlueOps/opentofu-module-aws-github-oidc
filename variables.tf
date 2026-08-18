@@ -1,13 +1,15 @@
 variable "github_repos" {
-  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment)."
+  description = "Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). The trust policy accepts only workflows on the repo's default branch (`default_branch`, required — e.g. \"main\"); set `allow_pull_requests = true` to also accept pull_request-triggered runs (required for plan-on-PR pipelines). `allowed_subs` replaces the default sub-claim patterns entirely."
   type = map(object({
-    github_org     = string
-    github_org_id  = string
-    repo_id        = string
-    policy_arns    = list(string)
-    state_account  = string
-    infra_accounts = map(string)
-    allowed_subs   = optional(list(string))
+    github_org          = string
+    github_org_id       = string
+    repo_id             = string
+    policy_arns         = list(string)
+    state_account       = string
+    infra_accounts      = map(string)
+    default_branch      = string
+    allow_pull_requests = optional(bool, false)
+    allowed_subs        = optional(list(string))
   }))
 
   validation {
@@ -16,6 +18,11 @@ variable "github_repos" {
       can(regex("^[0-9]+$", cfg.github_org_id)) && can(regex("^[0-9]+$", cfg.repo_id))
     ])
     error_message = "github_org_id and repo_id must be numeric GitHub IDs passed as strings — the REST API numeric ids, not GraphQL node IDs. Find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'."
+  }
+
+  validation {
+    condition     = alltrue([for cfg in values(var.github_repos) : length(cfg.default_branch) > 0])
+    error_message = "default_branch must be a non-empty branch name (e.g. \"main\")."
   }
 }
 
@@ -36,7 +43,8 @@ variable "custom_sub_account_roles" {
 }
 
 variable "immutable_subs_only" {
-  description = "When true (default), the default trust-policy sub condition uses only the immutable repo:ORG@ID/* pattern. Set to false to also include the legacy name-based repo:ORG/* pattern — needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting). Has no effect on repos that set allowed_subs."
+  deprecated  = "Transitional escape hatch only; opt your repos into immutable subject claims (use_immutable_subject) instead. This variable will be removed in a future major version."
+  description = "DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use_immutable_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set allowed_subs."
   type        = bool
   default     = true
 }

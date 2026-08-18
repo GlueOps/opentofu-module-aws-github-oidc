@@ -15,7 +15,10 @@ module "github_oidc" {
       policy_arns    = []
       state_account  = "state"
       infra_accounts = { core = "OrganizationAccountAccessRole" }
-      allowed_subs   = null # declared-but-unused: org-wide default sub patterns apply
+
+      default_branch      = "main"
+      allow_pull_requests = true # PR-triggered plans may assume the role too
+      allowed_subs        = null # declared-but-unused: default sub patterns apply
     }
 
     # Managed policies in the management account, sub scoped to main.
@@ -26,6 +29,7 @@ module "github_oidc" {
       policy_arns    = ["arn:aws:iam::aws:policy/AdministratorAccess"]
       state_account  = "state"
       infra_accounts = {}
+      default_branch = "main"
       allowed_subs   = ["repo:example-org@1234567/org-admin@9876544:ref:refs/heads/main"]
     }
   }

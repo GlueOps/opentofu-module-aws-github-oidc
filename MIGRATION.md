@@ -1,3 +1,27 @@
+# Migrating from v2.x to v3.0.0
+
+v3.0.0 tightens the **default** trust-policy sub scope from org-wide (`repo:ORG@ID/*` —
+any repo, branch, or event) to per-repo: only workflows on the repo's default branch.
+
+- **`default_branch` is a new required field** on every `github_repos` entry (e.g.
+  `"main"`) — plans fail with a type error until it is added.
+- **Pull-request-triggered runs are rejected by default.** Pipelines that plan on PRs
+  (including the GlueOps OpenTofu CD action's PR plans) must set
+  `allow_pull_requests = true` per repo, or their PR workflows fail closed at
+  AssumeRoleWithWebIdentity.
+- Repos deploying from other branches, from tags, or via environment-gated jobs also
+  fail closed under the new default — set `allowed_subs` for those repos before bumping.
+- `allowed_subs` and the ID-claim enforcement are unchanged; repos that set
+  `allowed_subs` are unaffected by all of the above.
+- With `immutable_subs_only = false`, legacy-format equivalents of the default patterns
+  are included (also branch-scoped — no longer org-wide). The variable is now
+  **deprecated** (native OpenTofu variable deprecation — setting it emits a warning):
+  opt your repos into immutable subject claims instead; it will be removed in a future
+  major version.
+- **The minimum OpenTofu version is now 1.11** (required by the native deprecation
+  attribute), and the module is OpenTofu-only — Terraform does not support it. Bump any
+  CI pins (e.g. an `OPENTOFU_VERSION` variable) to >= 1.11 before adopting v3.
+
 # Migrating from v1.x to v2.0.0
 
 v2.0.0 defaults trust policies to **immutable-only** sub patterns and replaces the

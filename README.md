@@ -90,9 +90,9 @@ All role names are auto-generated with a friendly prefix. If the name exceeds 64
 Roles are trusted to the **immutable numeric GitHub IDs** (`repository_owner_id` and
 `repository_id`, exact match) rather than the mutable `org/repo` name — immune to
 renames, transfers, and name recycling, and compatible with both the legacy and the
-post-2026-07-15 immutable `sub` formats. An org-scoped `sub` condition is kept because
-IAM requires one for the GitHub OIDC provider; scope it tighter per repo with
-`allowed_subs`. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
+post-2026-07-15 immutable `sub` formats. A `sub` condition is kept because IAM requires
+one for the GitHub OIDC provider; it scopes each repo to its `default_branch` (required),
+with pull\_request-triggered runs opt-in per repo and `allowed_subs` replacing it entirely. See [MIGRATION.md](MIGRATION.md) for the v0 -> v1 upgrade and the
 behavioral details (transfers fail closed until IDs are updated).
 
 Scope: GitHub.com only (GHES/data-residency tenants use a different issuer); the ID
@@ -106,35 +106,39 @@ assume it — no hand-written grant policies needed in the caller.
 
 ## Branch / environment scoping (`allowed_subs`)
 
-By default a repo's role is assumable by **any** workflow in that repo (any branch, PR, or
-environment) — enforcement is the immutable ID conditions, and the sub condition is
-org-scoped. To restrict a repo, set `allowed_subs` with exact sub patterns (immutable
-format, since the sub is matched as minted by the repo):
+By default a repo's role is assumable only by workflows on the repo's default branch
+(`default_branch`, **required** — e.g. `"main"`):
 
-```hcl
-allowed_subs = [
-  "repo:MyOrg@1234567/my-repo@9876543:ref:refs/heads/main", # deploys from main
-  "repo:MyOrg@1234567/my-repo@9876543:pull_request",        # PR-triggered plans
-]
+```
+repo:MyOrg@1234567/my-repo@9876543:ref:refs/heads/main
 ```
 
-Note the trade-off: scoping to `ref:refs/heads/main` alone also blocks PR-triggered plan
-workflows, because `pull_request` events mint a `:pull_request` sub context — include both
-patterns (as above) to keep plans on PRs, or omit the second to lock the role to pushes on
-main only. Environment-gated workflows mint `...:environment:NAME`.
+Pull-request-triggered runs mint a `:pull_request` sub context rather than a branch ref,
+so they are rejected by default. Pipelines that plan on PRs must opt in per repo with
+`allow_pull_requests = true`, which adds:
+
+```
+repo:MyOrg@1234567/my-repo@9876543:pull_request
+```
+
+Workflows on other branches, tags, or environment-gated jobs (`...:environment:NAME`) are
+always rejected by default. To scope a repo differently, set `allowed_subs` with exact sub
+patterns (immutable format, matched as minted by the repo) — it replaces the defaults
+entirely, e.g. to allow an environment add its `...:environment:NAME` sub.
 
 A recommended convention is to declare `allowed_subs = null` explicitly on every repo even
 when unused — it keeps the scoping knob visible in the config and makes tightening a
 one-line change. `null` behaves exactly like omitting the attribute (the org-wide default
 patterns apply).
 
-## Legacy sub pattern
+## Legacy sub pattern (deprecated)
 
 By default the trust-policy sub condition uses only the immutable `repo:ORG@ID/*` pattern.
-If some of your repos were created before 2026-07-15 and have not opted into immutable
-subject claims (the `use_immutable_subject` OIDC setting), set
-`immutable_subs_only = false` to also include the legacy name-based `repo:ORG/*` pattern —
-then flip it back once every repo is opted in.
+`immutable_subs_only = false` is a **deprecated** transitional escape hatch that adds
+legacy name-based equivalents of the default sub patterns, for repos created before
+2026-07-15 that have not opted into immutable subject claims (the `use_immutable_subject`
+OIDC setting). Prefer opting those repos in instead — the variable will be removed in a
+future major version.
 
 ## Multi-org support
 
@@ -151,7 +155,7 @@ Removing a sub-account is a two-step process:
 
 | Name | Version |
 |------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.11 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
 
 ## Providers
@@ -178,8 +182,8 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_custom_sub_account_roles"></a> [custom\_sub\_account\_roles](#input\_custom\_sub\_account\_roles) | Custom roles to create in sub-accounts | <pre>map(object({<br/>    account            = string<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  }))</pre> | `{}` | no |
-| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). `allowed_subs` optionally overrides the default sub-claim patterns (e.g. to scope to a branch or environment). | <pre>map(object({<br/>    github_org     = string<br/>    github_org_id  = string<br/>    repo_id        = string<br/>    policy_arns    = list(string)<br/>    state_account  = string<br/>    infra_accounts = map(string)<br/>    allowed_subs   = optional(list(string))<br/>  }))</pre> | n/a | yes |
-| <a name="input_immutable_subs_only"></a> [immutable\_subs\_only](#input\_immutable\_subs\_only) | When true (default), the default trust-policy sub condition uses only the immutable repo:ORG@ID/* pattern. Set to false to also include the legacy name-based repo:ORG/* pattern — needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use\_immutable\_subject OIDC setting). Has no effect on repos that set allowed\_subs. | `bool` | `true` | no |
+| <a name="input_github_repos"></a> [github\_repos](#input\_github\_repos) | Map of GitHub repo names to their OIDC configuration. `github_org_id` and `repo_id` are the immutable numeric GitHub IDs (find them with: gh api repos/ORG/REPO --jq '.id, .owner.id'). The trust policy accepts only workflows on the repo's default branch (`default_branch`, required — e.g. "main"); set `allow_pull_requests = true` to also accept pull\_request-triggered runs (required for plan-on-PR pipelines). `allowed_subs` replaces the default sub-claim patterns entirely. | <pre>map(object({<br/>    github_org          = string<br/>    github_org_id       = string<br/>    repo_id             = string<br/>    policy_arns         = list(string)<br/>    state_account       = string<br/>    infra_accounts      = map(string)<br/>    default_branch      = string<br/>    allow_pull_requests = optional(bool, false)<br/>    allowed_subs        = optional(list(string))<br/>  }))</pre> | n/a | yes |
+| <a name="input_immutable_subs_only"></a> [immutable\_subs\_only](#input\_immutable\_subs\_only) | DEPRECATED: transitional escape hatch only — will be removed in a future major version. Leave unset (true). Setting false adds legacy name-based equivalents of the default sub patterns, needed only while repos created before 2026-07-15 have not opted into immutable subject claims (the use\_immutable\_subject OIDC setting) — opt those repos in instead. Has no effect on repos that set allowed\_subs. | `bool` | `true` | no |
 | <a name="input_sub_account_ids"></a> [sub\_account\_ids](#input\_sub\_account\_ids) | Map of sub-account name to account ID (used to build ARNs in inline policies) | `map(string)` | n/a | yes |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags to apply to all resources | `map(string)` | `{}` | no |
 | <a name="input_thumbprint_list"></a> [thumbprint\_list](#input\_thumbprint\_list) | OIDC thumbprints for GitHub Actions (AWS no longer validates these but the field is required) | `list(string)` | <pre>[<br/>  "6938fd4d98bab03faadb97b34396831e3780aea1",<br/>  "1c58a3a8518e8759bf075b76b750d4f2df264fcd"<br/>]</pre> | no |
