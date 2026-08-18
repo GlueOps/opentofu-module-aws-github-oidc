@@ -75,6 +75,21 @@ run "default_sub_patterns" {
   }
 }
 
+run "legacy_sub_pattern_disabled" {
+  command = plan
+
+  variables {
+    include_legacy_sub_pattern = false
+  }
+
+  assert {
+    condition = jsondecode(aws_iam_role.github_oidc["demo-app"].assume_role_policy).Statement[0].Condition.StringLike["token.actions.githubusercontent.com:sub"] == [
+      "repo:Example-Org@1234567/*",
+    ]
+    error_message = "with include_legacy_sub_pattern = false only the immutable-format pattern must remain"
+  }
+}
+
 run "allowed_subs_override" {
   command = plan
 
