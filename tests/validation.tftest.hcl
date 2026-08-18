@@ -118,11 +118,11 @@ run "rejects_unknown_trusted_repo" {
       { repo_name = "demo-app", repo_id = "9876543" },
     ]
     custom_roles = {
-      "state--Whatever" = {
-        account            = "state"
-        policy_arns        = []
-        inline_policy      = null
-        trusted_oidc_repos = ["no-such-repo"]
+      state = {
+        Whatever = {
+          policy_arns        = []
+          trusted_oidc_repos = ["no-such-repo"]
+        }
       }
     }
   }
@@ -141,39 +141,15 @@ run "rejects_custom_role_with_unknown_account" {
       { repo_name = "demo-app", repo_id = "9876543" },
     ]
     custom_roles = {
-      "no-such-account--Whatever" = {
-        account            = "no-such-account"
-        policy_arns        = []
-        inline_policy      = null
-        trusted_oidc_repos = ["demo-app"]
-      }
-    }
-  }
-
-  expect_failures = [aws_iam_role_policy.github_oidc_assume_roles]
-}
-
-run "rejects_custom_role_key_account_mismatch" {
-  command = plan
-
-  variables {
-    github_org    = { name = "Example-Org", id = "1234567" }
-    repo_defaults = { state_account = "state", default_branch = "main" }
-    account_ids   = { state = "222222222222", core = "111111111111" }
-    github_repos = [
-      { repo_name = "demo-app", repo_id = "9876543" },
-    ]
-    custom_roles = {
-      # key says "state", account says "core" — role would be NAMED for one
-      # account but PLACED in another
-      "state--Whatever" = {
-        account            = "core"
-        policy_arns        = []
-        inline_policy      = null
-        trusted_oidc_repos = ["demo-app"]
+      no-such-account = {
+        Whatever = {
+          policy_arns        = []
+          trusted_oidc_repos = ["demo-app"]
+        }
       }
     }
   }
 
   expect_failures = [var.custom_roles]
 }
+

@@ -34,11 +34,11 @@ variables {
   }
 
   custom_roles = {
-    "core--xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" = {
-      account            = "core"
-      policy_arns        = []
-      inline_policy      = null
-      trusted_oidc_repos = []
+    core = {
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" = {
+        policy_arns        = []
+        trusted_oidc_repos = []
+      }
     }
   }
 

@@ -37,10 +37,11 @@ module "github_oidc" {
   }
 
   custom_roles = {
-    "core--Route53Access" = {
-      account            = "core"
-      policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
-      trusted_oidc_repos = ["demo-app"]
+    core = {
+      Route53Access = {
+        policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
+        trusted_oidc_repos = ["demo-app"]
+      }
     }
   }
 

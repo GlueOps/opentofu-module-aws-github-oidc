@@ -1,7 +1,6 @@
 terraform {
-  # Floor set by the native `deprecated` variable attribute (OpenTofu 1.11+).
-  # This also makes the module OpenTofu-only — Terraform does not support it.
-  required_version = ">= 1.11"
+  # Floor set by cross-variable references in validation blocks (1.9+).
+  required_version = ">= 1.9"
 
   required_providers {
     aws = {

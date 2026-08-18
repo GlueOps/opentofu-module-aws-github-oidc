@@ -29,17 +29,18 @@ variables {
 
   # Scoped custom roles in two further accounts, both trusting the same repo.
   custom_roles = {
-    "dns--Route53Only" = {
-      account            = "dns"
-      policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
-      inline_policy      = null
-      trusted_oidc_repos = ["platform-app"]
+    dns = {
+      Route53Only = {
+        policy_arns        = ["arn:aws:iam::aws:policy/AmazonRoute53FullAccess"]
+        trusted_oidc_repos = ["platform-app"]
+      }
     }
-    "data--SecurityGroupPatch" = {
-      account            = "data"
-      policy_arns        = []
-      inline_policy      = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
-      trusted_oidc_repos = ["platform-app", "other-app"]
+    data = {
+      SecurityGroupPatch = {
+        policy_arns        = []
+        inline_policy      = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+        trusted_oidc_repos = ["platform-app", "other-app"]
+      }
     }
   }
 }

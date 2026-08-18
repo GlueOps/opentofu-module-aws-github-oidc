@@ -1,3 +1,35 @@
+# Migrating from v4.x to v5.0.0
+
+Two removals and one reshape; **no resource or state changes** for configs already on
+immutable subject claims — adopting with equivalent values plans as "No changes".
+
+- **`custom_roles` is now nested**: account => role name => config; the `account` field
+  and the `"<account>--<RoleName>"` key convention are gone:
+
+  ```hcl
+  # before                                    # after
+  custom_roles = {                            custom_roles = {
+    "dns--Route53Only" = {                      dns = {
+      account            = "dns"                  Route53Only = {
+      policy_arns        = [...]                    policy_arns        = [...]
+      trusted_oidc_repos = [...]                    trusted_oidc_repos = [...]
+    }                                             }
+  }                                             }
+                                              }
+  ```
+
+  Rendered role names (`oidc-custom-<account>--<RoleName>`), outputs, and sub-account
+  resource addresses are unchanged.
+- **`immutable_subs_only` is removed** (deprecated since v3.0.x). Trust policies emit only
+  the immutable sub format. If any configured repo still mints legacy-format tokens
+  (created before 2026-07-15 and never opted in via `use_immutable_subject`), opt it in
+  before upgrading — or stay on v4, or express legacy patterns per repo via
+  `override_subs`.
+- `required_version` floor drops from `>= 1.11` to `>= 1.9` (the 1.11 requirement came
+  from the removed variable's `deprecated` attribute).
+- `thumbprint_list` remains: the AWS provider still cannot clear thumbprints once set
+  (hashicorp/terraform-provider-aws#40509).
+
 # Migrating from v3.x to v4.0.0
 
 v4.0.0 reshapes the interface for readability; **no trust-policy or resource behavior

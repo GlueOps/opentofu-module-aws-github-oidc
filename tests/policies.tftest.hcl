@@ -31,11 +31,11 @@ variables {
   }
 
   custom_roles = {
-    "core--Route53Access" = {
-      account            = "core"
-      policy_arns        = []
-      inline_policy      = null
-      trusted_oidc_repos = ["deploy-app"]
+    core = {
+      Route53Access = {
+        policy_arns        = []
+        trusted_oidc_repos = ["deploy-app"]
+      }
     }
   }
 }
