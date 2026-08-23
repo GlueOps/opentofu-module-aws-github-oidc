@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.1.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v5.0.0...v5.1.0) (2026-08-23)
+
+
+### Features
+
+* configurable max_session_duration on OIDC roles ([#32](https://github.com/GlueOps/opentofu-module-aws-github-oidc/issues/32)) ([6dff238](https://github.com/GlueOps/opentofu-module-aws-github-oidc/commit/6dff238579765e7c8b85be55c01d0e0e00d4cdb5))
+
 ## [5.0.0](https://github.com/GlueOps/opentofu-module-aws-github-oidc/compare/v4.0.0...v5.0.0) (2026-08-18)
 
 
