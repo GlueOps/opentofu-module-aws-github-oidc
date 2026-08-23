@@ -213,14 +213,14 @@ Removing a sub-account is a two-step process:
 ## Requirements
 
 | Name | Version |
-| ---- | ------- |
+|------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 5.0 |
 
 ## Providers
 
 | Name | Version |
-| ---- | ------- |
+|------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | 6.60.0 |
 
 ## Modules
@@ -230,7 +230,7 @@ No modules.
 ## Resources
 
 | Name | Type |
-| ---- | ---- |
+|------|------|
 | [aws_iam_openid_connect_provider.github](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_openid_connect_provider) | resource |
 | [aws_iam_role.github_oidc](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.github_oidc_assume_roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
@@ -239,7 +239,7 @@ No modules.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-| ---- | ----------- | ---- | ------- | :------: |
+|------|-------------|------|---------|:--------:|
 | <a name="input_account_ids"></a> [account\_ids](#input\_account\_ids) | Map of account name to account ID for every account referenced by state\_account, assume\_existing\_roles, or custom\_roles — including the management account when roles live there. | `map(string)` | n/a | yes |
 | <a name="input_custom_roles"></a> [custom\_roles](#input\_custom\_roles) | Scoped roles this module pair creates, grouped by account: account name => role name => config. Each repo listed in trusted\_oidc\_repos is granted sts:AssumeRole on the role automatically. Role names render as oidc-custom-<account>--<RoleName>. | <pre>map(map(object({<br/>    policy_arns        = list(string)<br/>    inline_policy      = optional(string)<br/>    trusted_oidc_repos = list(string)<br/>  })))</pre> | `{}` | no |
 | <a name="input_github_org"></a> [github\_org](#input\_github\_org) | Default GitHub organization for all repos: name and immutable numeric ID (gh api orgs/ORG --jq .id). Individual repos may override via their github\_org/github\_org\_id fields (multi-org setups). | <pre>object({<br/>    name = string<br/>    id   = string<br/>  })</pre> | `null` | no |
@@ -251,7 +251,7 @@ No modules.
 ## Outputs
 
 | Name | Description |
-| ---- | ----------- |
+|------|-------------|
 | <a name="output_custom_role_names"></a> [custom\_role\_names](#output\_custom\_role\_names) | Map of custom role key to computed role name (for use in sub-accounts) |
 | <a name="output_expected_subs"></a> [expected\_subs](#output\_expected\_subs) | Per-repo sub-claim patterns the trust policy accepts — diff against the repo's Settings -> Actions -> OIDC sub preview when debugging AssumeRoleWithWebIdentity failures. |
 | <a name="output_oidc_provider_arn"></a> [oidc\_provider\_arn](#output\_oidc\_provider\_arn) | ARN of the GitHub OIDC provider |
