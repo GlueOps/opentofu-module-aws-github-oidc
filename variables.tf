@@ -11,6 +11,7 @@ variable "github_repos" {
     default_branch        = optional(string)
     allow_pull_requests   = optional(bool)
     override_subs         = optional(list(string))
+    max_session_duration  = optional(number)
   }))
 
   validation {
@@ -47,6 +48,16 @@ variable "github_repos" {
     ])
     error_message = "Every repo must resolve a state_account — set repo_defaults.state_account or state_account on the repo entry."
   }
+
+  validation {
+    condition = alltrue([
+      for r in var.github_repos : (
+        r.max_session_duration == null ||
+        try(r.max_session_duration >= 3600 && r.max_session_duration <= 43200, false)
+      )
+    ])
+    error_message = "max_session_duration must be between 3600 and 43200 seconds (IAM limits)."
+  }
 }
 
 variable "github_org" {
@@ -59,13 +70,22 @@ variable "github_org" {
 }
 
 variable "repo_defaults" {
-  description = "Defaults applied to every github_repos entry unless the entry sets its own value. override_subs is deliberately not defaultable — sub-scope overrides must stay visible per repo."
+  description = "Defaults applied to every github_repos entry unless the entry sets its own value. override_subs is deliberately not defaultable — sub-scope overrides must stay visible per repo. max_session_duration (seconds, 3600-43200, default 3600) caps what workflows may request via role-duration-seconds; it only extends the federated first hop — chained sub-account sessions stay STS-capped at 3600."
   type = object({
-    state_account       = optional(string)
-    default_branch      = optional(string)
-    allow_pull_requests = optional(bool)
+    state_account        = optional(string)
+    default_branch       = optional(string)
+    allow_pull_requests  = optional(bool)
+    max_session_duration = optional(number)
   })
   default = {}
+
+  validation {
+    condition = (
+      var.repo_defaults.max_session_duration == null ||
+      try(var.repo_defaults.max_session_duration >= 3600 && var.repo_defaults.max_session_duration <= 43200, false)
+    )
+    error_message = "repo_defaults.max_session_duration must be between 3600 and 43200 seconds (IAM limits)."
+  }
 }
 
 variable "account_ids" {

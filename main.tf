@@ -12,6 +12,7 @@ locals {
     default_branch        = r.default_branch != null ? r.default_branch : var.repo_defaults.default_branch
     allow_pull_requests   = r.allow_pull_requests != null ? r.allow_pull_requests : coalesce(var.repo_defaults.allow_pull_requests, false)
     override_subs         = r.override_subs
+    max_session_duration  = r.max_session_duration != null ? r.max_session_duration : coalesce(var.repo_defaults.max_session_duration, 3600)
   } }
 }
 
@@ -138,10 +139,11 @@ locals {
 # --- OIDC Roles ---
 
 resource "aws_iam_role" "github_oidc" {
-  for_each           = local.repos
-  name               = local.role_names[each.key]
-  assume_role_policy = local.github_oidc_trust[each.key]
-  tags               = local.tags[each.key]
+  for_each             = local.repos
+  name                 = local.role_names[each.key]
+  assume_role_policy   = local.github_oidc_trust[each.key]
+  max_session_duration = each.value.max_session_duration
+  tags                 = local.tags[each.key]
 }
 
 # --- Managed policy attachments ---
